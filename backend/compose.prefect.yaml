@@ -1,0 +1,178 @@
+name: smart-port-prefect
+
+x-prefect-server-environment: &prefect-server-environment
+  PREFECT_API_DATABASE_CONNECTION_URL: >-
+    postgresql+asyncpg://${PREFECT_POSTGRES_USER:-prefect}:${PREFECT_POSTGRES_PASSWORD}@prefect-db:5432/${PREFECT_POSTGRES_DB:-prefect}
+  PREFECT_MESSAGING_BROKER: prefect_redis.messaging
+  PREFECT_MESSAGING_CACHE: prefect_redis.messaging
+  PREFECT_REDIS_MESSAGING_HOST: prefect-redis
+  PREFECT_REDIS_MESSAGING_PORT: "6379"
+  PREFECT_REDIS_MESSAGING_DB: "0"
+  PREFECT_SERVER_DOCKET_URL: redis://prefect-redis:6379/1
+  PREFECT_API_DATABASE_MIGRATE_ON_START: "true"
+
+x-prefect-client-environment: &prefect-client-environment
+  PREFECT_API_URL: http://prefect-server:4200/api
+  PREFECT_WORK_POOL: ${PREFECT_WORK_POOL:-smart-port-process}
+  PREFECT_CLI_PROMPT: "false"
+
+services:
+  prefect-db:
+    image: postgres:17-alpine
+    container_name: spm-prefect-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PREFECT_POSTGRES_USER:-prefect}
+      POSTGRES_PASSWORD: ${PREFECT_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${PREFECT_POSTGRES_DB:-prefect}
+      TZ: UTC
+    volumes:
+      - prefect-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${PREFECT_POSTGRES_USER:-prefect} -d ${PREFECT_POSTGRES_DB:-prefect}
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+    networks:
+      - prefect
+
+  prefect-redis:
+    image: redis:7.4-alpine
+    container_name: spm-prefect-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - prefect-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 10s
+    networks:
+      - prefect
+
+  prefect-server:
+    image: prefecthq/prefect:3.8.0-python3.12
+    container_name: spm-prefect-server
+    restart: unless-stopped
+    command:
+      - prefect
+      - server
+      - start
+      - --host
+      - 0.0.0.0
+      - --port
+      - "4200"
+      - --no-services
+    environment:
+      <<: *prefect-server-environment
+      PREFECT_UI_API_URL: http://127.0.0.1:${PREFECT_PORT:-4200}/api
+    ports:
+      - "${PREFECT_PORT:-4200}:4200"
+    depends_on:
+      prefect-db:
+        condition: service_healthy
+      prefect-redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request as u; u.urlopen('http://localhost:4200/api/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 24
+      start_period: 45s
+    networks:
+      - prefect
+
+  prefect-services:
+    image: prefecthq/prefect:3.8.0-python3.12
+    container_name: spm-prefect-services
+    restart: unless-stopped
+    command: ["prefect", "server", "services", "start"]
+    environment:
+      <<: *prefect-server-environment
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    networks:
+      - prefect
+
+  prefect-init:
+    image: smart-port/prefect-worker:1.0.0
+    build:
+      context: .
+      dockerfile: infra/prefect/Dockerfile
+    container_name: spm-prefect-init
+    profiles: ["tools"]
+    working_dir: /opt/smart-port
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - >-
+        prefect work-pool inspect "$${PREFECT_WORK_POOL}" >/dev/null 2>&1 ||
+        prefect work-pool create "$${PREFECT_WORK_POOL}" --type process;
+        prefect --no-prompt deploy --all
+    environment:
+      <<: *prefect-client-environment
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    networks:
+      - prefect
+
+  prefect-worker:
+    image: smart-port/prefect-worker:1.0.0
+    build:
+      context: .
+      dockerfile: infra/prefect/Dockerfile
+    container_name: spm-prefect-worker
+    restart: unless-stopped
+    working_dir: /opt/smart-port
+    command:
+      - prefect
+      - worker
+      - start
+      - --pool
+      - ${PREFECT_WORK_POOL:-smart-port-process}
+      - --type
+      - process
+      - --limit
+      - "1"
+      - --with-healthcheck
+    environment:
+      <<: *prefect-client-environment
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      SMART_PORT_S3_ENDPOINT: http://minio:9000
+      SMART_PORT_DB_HOST: timescaledb
+      SMART_PORT_DB_PORT: "5432"
+      SMART_PORT_DB_NAME: ${POSTGRES_DB}
+      SMART_PORT_DB_USER: ${POSTGRES_USER}
+      SMART_PORT_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    mem_limit: ${PREFECT_WORKER_MEMORY_LIMIT:-3g}
+    cpus: ${PREFECT_WORKER_CPUS:-2.0}
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    networks:
+      - prefect
+      - backend
+
+networks:
+  prefect:
+    name: smart-port-prefect
+  backend:
+    external: true
+    name: smart-port-backend
+
+volumes:
+  prefect-db-data:
+    name: smart-port-prefect-db-data
+  prefect-redis-data:
+    name: smart-port-prefect-redis-data

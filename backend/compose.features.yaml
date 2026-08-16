@@ -1,0 +1,44 @@
+name: smart-port-features
+
+services:
+  feature-builder:
+    image: smart-port/feature-builder:1.0.0
+    build:
+      context: .
+      dockerfile: infra/feature-builder/Dockerfile
+    container_name: spm-feature-builder
+    restart: unless-stopped
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      SMART_PORT_S3_ENDPOINT: http://minio:9000
+      SMART_PORT_DB_HOST: timescaledb
+      SMART_PORT_DB_PORT: "5432"
+      SMART_PORT_DB_NAME: ${POSTGRES_DB}
+      SMART_PORT_DB_USER: ${POSTGRES_USER}
+      SMART_PORT_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      TARGET_PORT_CODE: MAPTM
+      TARGET_LATITUDE: "35.8892"
+      TARGET_LONGITUDE: "-5.5000"
+      FEATURE_VERSION: copernicus-point-v1
+    ports:
+      - "${FEATURE_BUILDER_PORT:-8090}:8090"
+    mem_limit: ${FEATURE_BUILDER_MEMORY_LIMIT:-3g}
+    cpus: ${FEATURE_BUILDER_CPUS:-2.0}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    networks:
+      - backend
+
+networks:
+  backend:
+    external: true
+    name: smart-port-backend

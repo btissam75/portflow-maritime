@@ -1,0 +1,60 @@
+name: smart-port-platform
+
+services:
+  platform-api:
+    image: smart-port/platform-api:1.0.0
+    build:
+      context: .
+      dockerfile: infra/platform-api/Dockerfile
+    container_name: spm-platform-api
+    restart: unless-stopped
+    environment:
+      SMART_PORT_DB_HOST: timescaledb
+      SMART_PORT_DB_PORT: "5432"
+      SMART_PORT_DB_NAME: ${POSTGRES_DB}
+      SMART_PORT_DB_USER: ${POSTGRES_USER}
+      SMART_PORT_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      B56F_CORS_ORIGINS: http://localhost:${MARITIME_PLATFORM_PORT:-8088}
+      B56F_DB_POOL_SIZE: "8"
+    ports:
+      - "${PLATFORM_API_PORT:-8092}:8092"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8092/ready', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - backend
+
+  maritime-web:
+    image: smart-port/maritime-web:1.0.0
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:${PLATFORM_API_PORT:-8092}
+    container_name: spm-maritime-web
+    restart: unless-stopped
+    ports:
+      - "${MARITIME_PLATFORM_PORT:-8088}:80"
+    depends_on:
+      platform-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks:
+      - backend
+
+networks:
+  backend:
+    external: true
+    name: smart-port-backend

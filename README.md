@@ -1,6 +1,8 @@
 # PortFlow Maritime
 
-React control tower for maritime supervision and decision support at Tanger Med.
+Full-stack maritime supervision and decision-support platform for Tanger Med. The repository is
+now a monorepo: the React control tower lives at the root and the data/ML/API platform lives in
+[`backend/`](./backend/).
 
 ## Functional pages
 
@@ -16,6 +18,8 @@ Detailed handoff documentation:
 - [`FRONTEND_HANDOFF.md`](./FRONTEND_HANDOFF.md): pages, interactions and frontend limitations
 - [`TECHNICAL_ARCHITECTURE.md`](./TECHNICAL_ARCHITECTURE.md): Prefect, TimescaleDB, MinIO,
   FastAPI, modeling, governance and deployment
+- [`PLATFORM_ENGINEERING_GUIDE.md`](./PLATFORM_ENGINEERING_GUIDE.md): canonical end-to-end
+  installation, architecture, data, modeling, API, operations, security and handoff guide
 
 ## Stack
 
@@ -24,6 +28,33 @@ Detailed handoff documentation:
 - Material UI
 - Apache ECharts
 - Nginx and Docker for publication
+- FastAPI and Pydantic
+- Prefect and Airflow
+- TimescaleDB, MinIO, MLflow and Grafana
+- CatBoost, PyTorch/GRU, NeuralForecast, AutoGluon/Chronos and conformal calibration
+
+## Full platform
+
+```powershell
+Copy-Item .\backend\.env.example .\backend\.env
+# Replace every CHANGE_ME value before startup.
+Set-Location .\backend
+docker compose up -d --build
+docker compose -f compose.prefect.yaml up -d --build
+docker compose -f compose.prefect.yaml --profile tools run --rm prefect-init
+docker compose -f compose.platform.yaml up -d --build
+```
+
+Platform URLs:
+
+- frontend: `http://localhost:8088/weather`
+- API docs: `http://localhost:8092/docs`
+- Prefect: `http://localhost:4200`
+- MinIO: `http://localhost:9001`
+- MLflow: `http://localhost:5000`
+
+Read [`PLATFORM_ENGINEERING_GUIDE.md`](./PLATFORM_ENGINEERING_GUIDE.md) before running scientific
+pipelines or changing data/model contracts.
 
 ## Local development
 

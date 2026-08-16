@@ -25,10 +25,35 @@ dist-ssr
 
 # Local source snapshots and rollback archives
 *.tar
+*.bak
 
 # Test and tool caches
 coverage/
 .vite/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Backend runtime data and generated scientific artifacts
+backend/backups/
+backend/exports/
+backend/data/
+backend/logs/
+backend/artifacts/
+backend/models/
+backend/reports/
+backend/**/*.parquet
+backend/**/*.feather
+backend/**/*.joblib
+backend/**/*.pkl
+backend/**/*.pt
+backend/**/*.ckpt
+backend/**/*.onnx
+backend/**/*.nc
+backend/**/*.grib
+backend/**/*.grib2
 
 # Editor directories and files
 .vscode/*

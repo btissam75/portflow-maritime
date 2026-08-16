@@ -1,0 +1,15 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+boto3>=1.35,<2
+numpy>=2,<3
+pandas>=2.2,<3
+pyarrow>=18,<24
+scipy>=1.14,<2
+scikit-learn>=1.5,<2
+matplotlib>=3.9,<4
+catboost>=1.2.8,<2
+mlflow==3.13.0
+psycopg2-binary>=2.9,<3
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.9.1+cpu
+neuralforecast==3.2.0

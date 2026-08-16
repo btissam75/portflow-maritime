@@ -1,0 +1,858 @@
+name: smart-port-maritime-prefect
+prefect-version: 3.8.0
+build: null
+push: null
+pull:
+- prefect.deployments.steps.set_working_directory:
+    directory: /opt/smart-port
+deployments:
+- name: b58ca-manual
+  version: '1'
+  tags:
+  - smart-port
+  - weather
+  - data-quality
+  - read-only
+  description: Read-only weather missingness audit. Distinguishes sparse gaps from
+    structurally absent variables before any imputation or generation.
+  entrypoint: prefect_flows/b58ca_flow.py:b58ca_weather_missingness_audit_flow
+  parameters:
+    output_bucket: gold-maritime
+    output_prefix: version=1
+    force: false
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: data-quality
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+- name: b58cb-manual
+  version: '1'
+  tags:
+  - smart-port
+  - weather
+  - external-data
+  - reanalysis
+  - research-only
+  description: Collect ERA5 atmosphere, ERA5-Ocean and archived visibility with strict
+    provenance and no Core mutation.
+  entrypoint: prefect_flows/b58cb_flow.py:b58cb_external_weather_enrichment_flow
+  parameters:
+    force_download: false
+    materialize_timescale: true
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: external-enrichment
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+- name: b58cc-memory-safe
+  version: '3'
+  tags:
+  - smart-port
+  - weather
+  - ablation
+  - temporal-validation
+  - research-only
+  description: Calendar-audited memory-safe comparison of wave-only and retrospective
+    external-weather feature tracks with purged temporal validation.
+  entrypoint: prefect_flows/b58cc_flow.py:b58cc_weather_feature_ablation_flow
+  parameters:
+    force: false
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: model-research
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        LOKY_MAX_CPU_COUNT: '2'
+        B58CC_MAX_ITER: '140'
+- name: b58cd-hourly
+  version: '1'
+  tags:
+  - smart-port
+  - weather
+  - marine
+  - issue-time
+  - live-collection
+  description: Hourly immutable capture of live Open-Meteo weather and marine forecast
+    snapshots with real availability timestamps.
+  entrypoint: prefect_flows/b58cd_flow.py:b58cd_issue_time_weather_forecast_collection_flow
+  parameters: {}
+  enforce_parameter_schema: true
+  schedules:
+  - cron: 7 * * * *
+    slug: hourly-issue-time-capture
+    timezone: UTC
+    active: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: CANCEL_NEW
+  work_pool:
+    name: smart-port-process
+    work_queue_name: external-enrichment
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+- name: b59a-manual
+  version: '1'
+  tags:
+  - smart-port
+  - port-call
+  - data-quality
+  - point-in-time
+  - read-only
+  description: Read-only audit of port-call target quality, missing ATD semantics,
+    dynamic landmark yield and historical availability evidence.
+  entrypoint: prefect_flows/b59a_flow.py:b59a_dynamic_port_call_data_audit_flow
+  parameters:
+    force: false
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: data-quality
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+- name: b60a-manual
+  version: '1'
+  tags:
+  - smart-port
+  - maritime
+  - dataset
+  - time-series
+  - point-in-time
+  description: Build the versioned multitask hourly arrival, wave and event-sequence
+    dataset with separate purged temporal splits and no synthetic targets.
+  entrypoint: prefect_flows/b60a_flow.py:b60a_maritime_multitask_hourly_dataset_flow
+  parameters:
+    force: false
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: data-engineering
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+- name: b60a1-manual
+  version: '1'
+  tags:
+  - smart-port
+  - time-series
+  - correlation
+  - pca
+  - anti-leakage
+  description: TRAIN-only Pearson/Spearman, redundancy, stability, ACF/PACF, mutual-information,
+    VIF and semantic block-PCA audit.
+  entrypoint: prefect_flows/b60a1_flow.py:b60a1_feature_representation_audit_flow
+  parameters:
+    force: false
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: data-science
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+- name: b60a2-manual
+  version: '2'
+  tags:
+  - smart-port
+  - time-series
+  - predictive-signal
+  - rolling-origin
+  - anti-leakage
+  description: Purged TRAIN rolling-origin predictive signal audit with safe baselines,
+    Ridge ablation, nonlinear block permutation and a TRAIN-mean-referenced placebo.
+  entrypoint: prefect_flows/b60a2_flow.py:b60a2_predictive_signal_audit_flow
+  parameters:
+    force: false
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: data-science
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+- name: b60b-manual
+  version: '1'
+  tags:
+  - smart-port
+  - time-series
+  - nhits
+  - patchtst
+  - negative-binomial
+  - conformal
+  - anti-leakage
+  description: Target-specific maritime benchmark with Dynamic Negative Binomial,
+    hazard, N-HiTS, PatchTST and split-conformal intervals.
+  entrypoint: prefect_flows/b60b_flow.py:b60b_advanced_timeseries_benchmark_flow
+  parameters:
+    force: false
+    sequence_max_steps: 250
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: data-science
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b60c-manual
+  version: '1'
+  tags:
+  - smart-port
+  - maritime
+  - port-call
+  - dynamic-landmarking
+  - anti-leakage
+  - multitask
+  description: Build real vessel port-call decision landmarks for early delay risk,
+    remaining-time and survival models; keep synthetic stress scenarios separate.
+  entrypoint: prefect_flows/b60c_flow.py:b60c_operational_port_call_dataset_flow
+  parameters:
+    force: false
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: data-engineering
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b60ch-manual
+  version: '1'
+  tags:
+  - smart-port
+  - maritime
+  - historical-events
+  - calendar
+  - point-in-time
+  - association-audit
+  description: Build the sourced 2020-2025 event registry and point-in-time event
+    context for B60C, with research-only retrospective shocks.
+  entrypoint: prefect_flows/b60ch_flow.py:b60ch_historical_event_intelligence_flow
+  parameters:
+    force: false
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: data-engineering
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b61a-manual
+  version: '1'
+  tags:
+  - smart-port
+  - maritime
+  - data-completion
+  - governance
+  - physical-features
+  - anti-leakage
+  description: Create a governed B60C enrichment with train-only thresholds, physical
+    and operational derivations, B60C-H events and B58C-D issue-time forecasts.
+  entrypoint: prefect_flows/b61a_flow.py:b61a_governed_data_completion_flow
+  parameters:
+    force: false
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: data-engineering
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b61b-manual
+  version: '1'
+  tags:
+  - smart-port
+  - maritime
+  - multitask
+  - temporal
+  - survival
+  - mixture-of-experts
+  - conformal
+  - anti-leakage
+  description: Governed port-call ordinal delay, remaining-duration quantiles and
+    discrete-survival benchmark with CatBoost, shared GRU and contextual MoE.
+  entrypoint: prefect_flows/b61b_flow.py:b61b_multitask_temporal_survival_moe_flow
+  parameters:
+    force: false
+    sequence_max_steps: 400
+    catboost_iterations: 350
+    max_train_rows: 80000
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: model-training
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+        PYTORCH_ENABLE_MPS_FALLBACK: '1'
+- name: b61ax-manual
+  version: '1'
+  tags:
+  - smart-port
+  - maritime
+  - external-data
+  - rare-events
+  - evt
+  - synthetic
+  - train-only
+  - governance
+  description: Build traceable, low-weight, TRAIN-only rare-delay counterfactuals
+    from real B61A trajectories and an external real port-call EVT prior.
+  entrypoint: prefect_flows/b61ax_flow.py:b61ax_governed_rare_tail_augmentation_flow
+  parameters:
+    force: false
+    force_download: false
+    external_url: https://www.kaggle.com/api/v1/datasets/download/bobaaayoung/container-ship-data-collection
+    external_source_name: KAGGLE_HELSINKI_TALLINN_CONTAINER_SHIPS
+    external_source_license: KAGGLE_DATA_CARD_SOURCE_PORT_AUTHORITIES_LICENSE_REVIEW_REQUIRED
+    synthetic_calls: 2500
+    synthetic_call_weight: 0.2
+    max_delay_h: 240.0
+    max_download_mb: 600
+    seed: 20260805
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: data-engineering
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b61bv2-manual
+  version: '2'
+  tags:
+  - smart-port
+  - maritime
+  - multitask
+  - survival
+  - rare-event
+  - evt
+  - sequence
+  - task-router
+  - conformal
+  - anti-leakage
+  description: Governed real-only, cost-sensitive and EVT-supplemented maritime experts
+    with VALID task routing, separate calibration and a single unchanged real TEST
+    diagnostic.
+  entrypoint: prefect_flows/b61bv2_flow.py:b61bv2_maritime_rare_event_hybrid_flow
+  parameters:
+    force: false
+    sequence_max_steps: 300
+    catboost_iterations: 320
+    max_train_rows: 80000
+    bootstrap_replicates: 300
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: model-training
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+        PYTORCH_ENABLE_MPS_FALLBACK: '1'
+- name: b61bv21-recalibration-only
+  version: '2.1'
+  tags:
+  - smart-port
+  - maritime
+  - recalibration-only
+  - platt
+  - rare-event
+  - bootstrap
+  - anti-leakage
+  description: Frozen B61B-v2 replay with rank-preserving GT3/GT6 Platt recalibration
+    and corrected eligible port-call bootstrap.
+  entrypoint: prefect_flows/b61bv21_flow.py:b61bv21_maritime_recalibration_only_flow
+  parameters:
+    force: false
+    bootstrap_replicates: 500
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: model-training
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b61c-shadow-replay
+  version: '1'
+  tags:
+  - smart-port
+  - maritime
+  - temporal-hazard
+  - historical-replay
+  - dynamic-policy
+  - state-machine
+  - shadow-api
+  - anti-leakage
+  description: Capacity-constrained temporal decision replay using frozen B61B-v2.1
+    probabilities and hazards.
+  entrypoint: prefect_flows/b61c_flow.py:b61c_historical_replay_shadow_decision_flow
+  parameters:
+    force: false
+    gt3_budgets: 1,2,3,5
+    gt6_budgets: 0.25,0.5,1
+    bucket_hours: 6
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: decision-replay
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b61d-contextual-hsmm
+  version: '1'
+  tags:
+  - smart-port
+  - maritime
+  - contextual-hsmm
+  - explicit-duration
+  - hidden-regime
+  - lead-time
+  - challenger
+  - shadow-api
+  description: Contextual explicit-duration hidden-state challenger over frozen B61B-v2.1
+    and B61C-v1.1 outputs.
+  entrypoint: prefect_flows/b61d_flow.py:b61d_contextual_hsmm_flow
+  parameters:
+    force: false
+    hsmm_weights: 0.25,0.5,0.75,1
+    gt3_budgets: 1,2,3
+    gt6_budgets: 0.5,1
+    bucket_hours: 6
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: hsmm-research
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b61d-v11-anchored-hsmm
+  version: '1.1'
+  tags:
+  - smart-port
+  - maritime
+  - anchored-hsmm
+  - pre-breach
+  - explicit-duration
+  - b61c-control
+  - lead-time
+  - shadow-api
+  description: Pre-breach anchored contextual HSMM with exact B61C weight-zero control.
+  entrypoint: prefect_flows/b61d_v11_flow.py:b61d_v11_anchored_hsmm_flow
+  parameters:
+    force: false
+    hsmm_weights: 0.1,0.2,0.3,0.4
+    gt3_budgets: 1,2,3
+    gt6_budgets: 0.5,1
+    bucket_hours: 6
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: anchored-hsmm-research
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b61d-v12-state-conditional-policy
+  version: '1.2'
+  tags:
+  - smart-port
+  - maritime
+  - state-policy
+  - anchored-hsmm
+  - capacity
+  - hysteresis
+  - cluster-bootstrap
+  - shadow-api
+  description: State-conditional decision policy over frozen B61D-v1.1 states.
+  entrypoint: prefect_flows/b61d_v12_flow.py:b61d_v12_state_conditional_policy_flow
+  parameters:
+    force: false
+    policy_modes: STATE_STRICT,POSTERIOR_STRICT,CRITICAL_WITH_CONGESTED_BACKSTOP
+    probability_thresholds: 0.2,0.3,0.4,0.5
+    alert_budgets: 1,2,3
+    hold_windows: 0,1,2
+    bucket_hours: 6
+    bootstrap_iterations: 500
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: state-policy-research
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b61d-v13-dual-stage-policy
+  version: '1.3'
+  tags:
+  - smart-port
+  - maritime
+  - dual-stage
+  - early-warning
+  - critical-action
+  - anchored-hsmm
+  - cluster-bootstrap
+  - shadow-api
+  description: Separate early-warning and critical-action contracts over frozen B61C
+    hazards and B61D-v1.1 anchored states.
+  entrypoint: prefect_flows/b61d_v13_flow.py:b61d_v13_dual_stage_policy_flow
+  parameters:
+    force: false
+    early_modes: PRESSURE_CONGESTED,TRANSITION_AWARE,NON_FLUID
+    early_min_scores: 0.05,0.10,0.15,0.20
+    early_top_ks: 1,2
+    critical_top_ks: 1,2
+    hold_windows: 0,1
+    bucket_hours: 6
+    bootstrap_iterations: 500
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: dual-stage-policy-research
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b61d-v131-contract-recalibration
+  version: 1.3.1
+  tags:
+  - smart-port
+  - maritime
+  - recalibration-only
+  - early-warning-only
+  - critical-action
+  - two-valid-roles
+  - cluster-bootstrap
+  - governance
+  description: Corrected separate-stage contracts replicated on VALID_SELECT and VALID_CALIBRATE;
+    TEST remains diagnostic only.
+  entrypoint: prefect_flows/b61d_v131_flow.py:b61d_v131_contract_recalibration_flow
+  parameters:
+    force: false
+    early_modes: PRESSURE_CONGESTED,TRANSITION_AWARE,NON_FLUID
+    early_min_scores: 0.05,0.10,0.15,0.20
+    early_top_ks: 1,2
+    critical_top_ks: 1,2
+    hold_windows: 0,1
+    bucket_hours: 6
+    bootstrap_iterations: 500
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: dual-stage-contract-recalibration
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b61e-capacity-aware-temporal-ranking
+  version: '1'
+  tags:
+  - smart-port
+  - maritime
+  - temporal-ranking
+  - capacity-aware
+  - pre-breach
+  - all-states
+  - shadow-only
+  - governance
+  description: Rank every active port call for GT3 breach risk within 24h. VALID_SELECT
+    chooses the score and VALID_CALIBRATE chooses capacity.
+  entrypoint: prefect_flows/b61e_flow.py:b61e_capacity_aware_temporal_ranking_flow
+  parameters:
+    force: false
+    score_names: HAZARD_24H,P_GT3,TEMPORAL_HAZARD_MOE
+    top_ks: 1,2
+    bucket_hours: 6
+    bootstrap_iterations: 500
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: capacity-aware-temporal-ranking
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+- name: b62-manual
+  version: '1'
+  tags:
+  - smart-port
+  - metocean
+  - autogluon
+  - chronos2
+  - weather-to-wave
+  - vessel-impact
+  - probabilistic
+  - anti-leakage
+  - shadow-only
+  description: AutoGluon Chronos-2 weather-to-wave cascade with frozen VALID model
+    selection, diagnostic TEST and a non-automatic vessel priority overlay.
+  entrypoint: prefect_flows/b62_flow.py:b62_weather_wave_vessel_autogluon_flow
+  parameters:
+    force: false
+    validation_days: 365
+    test_days: 365
+    backtest_step_h: 168
+    preset: chronos2_small
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: metocean-foundation-models
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        CUDA_VISIBLE_DEVICES: ''
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+        TOKENIZERS_PARALLELISM: 'false'
+        HF_HOME: /opt/smart-port/.cache/huggingface
+- name: b62a-manual
+  version: '1'
+  tags:
+  - smart-port
+  - metocean
+  - rare-events
+  - augmentation
+  - quantile-regression
+  - conformal
+  - train-only
+  - post-hoc-replay
+  - synthetic-stress
+  - shadow-only
+  description: TRAIN-only low-weight metocean tail augmentation with a direct quantile
+    wave challenger, real calibration, real VALID selection, frozen TEST diagnostic,
+    weekly post-hoc replay and separate synthetic stress invariants.
+  entrypoint: prefect_flows/b62a_flow.py:b62a_governed_metocean_augmentation_flow
+  parameters:
+    force: false
+    synthetic_rows: 8000
+    synthetic_weight: 0.1
+    tail_quantile: 0.9
+    weekly_step_h: 168
+    stress_scenarios: 500
+    max_iter: 120
+    seed: 20260811
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: metocean-foundation-models
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        CUDA_VISIBLE_DEVICES: ''
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+        LOKY_MAX_CPU_COUNT: '2'
+- name: b62b-manual
+  version: '1'
+  tags:
+  - smart-port
+  - metocean
+  - previous-runs
+  - vintage-forecast
+  - weather-to-wave
+  - conformal
+  - block-bootstrap
+  - anti-leakage
+  - fresh-forward
+  - shadow-first
+  description: Authentic fixed-lead weather forecast backfill, frozen B62/B62A comparison,
+    new TEST-once evidence and fresh issue-time promotion contract.
+  entrypoint: prefect_flows/b62b_flow.py:b62b_vintage_forecast_shadow_validation_flow
+  parameters:
+    force: false
+    force_download: false
+    backfill_days: 900
+    valid_days: 180
+    test_days: 180
+    calibration_days: 90
+    chunk_days: 90
+    min_fresh_origins: 60
+    min_fresh_days: 30
+    bootstrap_iterations: 500
+    min_gain_pct: 5.0
+    max_iter: 160
+    seed: 20260811
+  enforce_parameter_schema: true
+  concurrency_limit:
+    limit: 1
+    collision_strategy: ENQUEUE
+  work_pool:
+    name: smart-port-process
+    work_queue_name: metocean-foundation-models
+    job_variables:
+      working_dir: /opt/smart-port
+      stream_output: true
+      env:
+        CUDA_VISIBLE_DEVICES: ''
+        OMP_NUM_THREADS: '2'
+        OPENBLAS_NUM_THREADS: '2'
+        MKL_NUM_THREADS: '2'
+        NUMEXPR_NUM_THREADS: '2'
+        LOKY_MAX_CPU_COUNT: '2'

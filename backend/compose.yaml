@@ -1,0 +1,149 @@
+name: smart-port-maritime
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:2.28.0-pg17
+    container_name: spm-timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TIMESCALEDB_TELEMETRY: "off"
+      TZ: UTC
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+      - ./infra/timescaledb/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks:
+      - backend
+
+  minio:
+    image: smart-port/minio:RELEASE.2025-10-15T17-29-55Z
+    build:
+      context: ./infra/minio
+      args:
+        MINIO_VERSION: RELEASE.2025-10-15T17-29-55Z
+    container_name: spm-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:${MINIO_CONSOLE_PORT:-9001}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks:
+      - backend
+
+  storage-init:
+    image: smart-port/mlflow:3.13.0
+    build:
+      context: ./infra/mlflow
+    container_name: spm-storage-init
+    restart: "no"
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+    command: ["python", "/opt/smart-port/init_buckets.py"]
+    volumes:
+      - ./infra/storage/init_buckets.py:/opt/smart-port/init_buckets.py:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - backend
+
+  mlflow:
+    image: smart-port/mlflow:3.13.0
+    build:
+      context: ./infra/mlflow
+    container_name: spm-mlflow
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      MLFLOW_ALLOWED_HOSTS: ${MLFLOW_ALLOWED_HOSTS}
+    ports:
+      - "${MLFLOW_PORT:-5000}:5000"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      storage-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana:13.0.3
+    container_name: spm-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/health | grep -q ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    networks:
+      - backend
+
+networks:
+  backend:
+    name: smart-port-backend
+
+volumes:
+  timescale-data:
+    name: smart-port-timescale-data
+  minio-data:
+    name: smart-port-minio-data
+  grafana-data:
+    name: smart-port-grafana-data

@@ -1,0 +1,49 @@
+name: smart-port-ais
+
+services:
+  ais-collector:
+    image: smart-port/feature-builder:1.0.0
+    build:
+      context: .
+      dockerfile: infra/feature-builder/Dockerfile
+    container_name: spm-ais-collector
+    command: ["python", "-m", "feature_builder.ais_collector"]
+    restart: unless-stopped
+    environment:
+      AISSTREAM_API_KEY: ${AISSTREAM_API_KEY:?AISSTREAM_API_KEY must be set}
+      AISSTREAM_URL: wss://stream.aisstream.io/v0/stream
+      AIS_LAT_MIN: "35.65"
+      AIS_LAT_MAX: "36.25"
+      AIS_LON_MIN: "-6.10"
+      AIS_LON_MAX: "-5.00"
+      AIS_FLUSH_SECONDS: "60"
+      AIS_MAX_BATCH_MESSAGES: "1000"
+      AIS_RETRY_INITIAL_SECONDS: "15"
+      AIS_RETRY_503_MIN_SECONDS: "60"
+      AIS_RETRY_MAX_SECONDS: "300"
+      AIS_STABLE_CONNECTION_SECONDS: "120"
+      AIS_BRONZE_BUCKET: bronze-maritime
+      AIS_COLLECTOR_VERSION: b56d1-aisstream-v1
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      SMART_PORT_S3_ENDPOINT: http://minio:9000
+      SMART_PORT_DB_HOST: timescaledb
+      SMART_PORT_DB_PORT: "5432"
+      SMART_PORT_DB_NAME: ${POSTGRES_DB}
+      SMART_PORT_DB_USER: ${POSTGRES_USER}
+      SMART_PORT_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    mem_limit: 512m
+    cpus: 0.75
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - backend
+
+networks:
+  backend:
+    external: true
+    name: smart-port-backend

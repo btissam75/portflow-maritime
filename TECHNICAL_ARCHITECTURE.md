@@ -6,18 +6,18 @@ Ce guide est la reference de passation technique du sous-projet PortFlow Maritim
 comment le frontend React s'insere dans la plateforme complete : collecte, orchestration Prefect,
 stockage MinIO et TimescaleDB, modelisation, gouvernance, FastAPI et publication Nginx.
 
-Important : le depot `portflow-maritime` contient actuellement le frontend, son Dockerfile et ses
-contrats TypeScript. Le code des flows Prefect, les migrations TimescaleDB, les modeles entraines
-et le service FastAPI ne sont pas presents dans ce depot. Les elements backend ci-dessous sont
-documentes a partir des contrats frontend et des executions observees. Ils doivent etre verifies
-dans le futur depot backend avant modification.
+Le depot est maintenant un monorepo. Le frontend est a la racine et le code backend est present
+dans `backend/` : flows Prefect, DAGs Airflow, bootstrap TimescaleDB, services de features et de
+modelisation, FastAPI, Docker Compose et infrastructure. Les donnees, secrets, volumes et modeles
+entraines restent volontairement hors Git. Pour l'installation et l'exploitation de bout en bout,
+utiliser `PLATFORM_ENGINEERING_GUIDE.md` comme guide canonique.
 
 Etat de confiance utilise dans ce document :
 
 | Etiquette | Signification |
 |---|---|
 | `IMPLEMENTE-ICI` | Le code est present et verifiable dans ce depot. |
-| `EXTERNE-OBSERVE` | Le composant a ete observe en execution, mais son code n'est pas ici. |
+| `EXTERNE-OBSERVE` | Le composant ou son etat d'execution depend de volumes/donnees hors Git. |
 | `CONTRAT` | Le frontend depend explicitement de ce schema ou endpoint. |
 | `CIBLE` | Architecture recommandee, pas encore implementee. |
 
@@ -86,15 +86,15 @@ Les noms suivants ont ete observes sur la station de developpement :
 
 | Service | Port / acces | Responsabilite | Statut depot |
 |---|---:|---|---|
-| `spm-timescaledb` | interne Docker | Donnees temporelles, features et tables serving | `EXTERNE-OBSERVE` |
-| `spm-minio` | `9000/9001` | Objets Bronze/Gold, rapports et modeles | `EXTERNE-OBSERVE` |
-| `spm-storage-init` | job | Creation des buckets et initialisation | `EXTERNE-OBSERVE` |
-| `spm-prefect-db` | interne | Metadonnees d'orchestration Prefect | `EXTERNE-OBSERVE` |
-| `spm-prefect-redis` | interne | Coordination/queue Prefect | `EXTERNE-OBSERVE` |
-| `spm-prefect-server` | `4200` | API et interface d'orchestration | `EXTERNE-OBSERVE` |
-| `spm-prefect-worker` | interne | Execution Python des flows et taches | `EXTERNE-OBSERVE` |
-| `spm-platform-api` | `8092` | FastAPI et contrats JSON metier | `EXTERNE-OBSERVE` |
-| `spm-maritime-web` | `8088` | Nginx et bundle React | `IMPLEMENTE-ICI` en partie |
+| `spm-timescaledb` | interne Docker | Donnees temporelles, features et tables serving | `IMPLEMENTE-ICI` |
+| `spm-minio` | `9000/9001` | Objets Bronze/Gold, rapports et modeles | `IMPLEMENTE-ICI` |
+| `spm-storage-init` | job | Creation des buckets et initialisation | `IMPLEMENTE-ICI` |
+| `spm-prefect-db` | interne | Metadonnees d'orchestration Prefect | `IMPLEMENTE-ICI` |
+| `spm-prefect-redis` | interne | Coordination/queue Prefect | `IMPLEMENTE-ICI` |
+| `spm-prefect-server` | `4200` | API et interface d'orchestration | `IMPLEMENTE-ICI` |
+| `spm-prefect-worker` | interne | Execution Python des flows et taches | `IMPLEMENTE-ICI` |
+| `spm-platform-api` | `8092` | FastAPI et contrats JSON metier | `IMPLEMENTE-ICI` |
+| `spm-maritime-web` | `8088` | Nginx et bundle React | `IMPLEMENTE-ICI` |
 
 Ne pas confondre les deux bases PostgreSQL :
 
@@ -246,9 +246,10 @@ Organisation logique recommandee :
 | `ml` | Predictions, calibrations, metriques et audits. |
 | `serving` | Vues/tables stables lues par FastAPI. |
 
-Cette organisation est une cible. Les migrations reelles ne sont pas dans le depot actuel : la
-prochaine IA doit inspecter `information_schema`, les index et les contraintes avant de renommer
-ou deplacer une table.
+Le bootstrap SQL est present dans `backend/infra/timescaledb/init/` et plusieurs flows creent ou
+materialisent leurs tables versionnees. Les volumes de donnees ne sont pas dans Git : avant toute
+modification destructive, inspecter `information_schema`, les index et les contraintes de la base
+reellement demarree.
 
 ### 5.2 Tables serving observees
 

@@ -1,0 +1,46 @@
+name: smart-port-training
+
+services:
+  model-trainer:
+    image: smart-port/model-trainer:1.0.0
+    build:
+      context: .
+      dockerfile: infra/model-trainer/Dockerfile
+    container_name: spm-model-trainer
+    restart: unless-stopped
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      SMART_PORT_S3_ENDPOINT: http://minio:9000
+      SMART_PORT_DB_HOST: timescaledb
+      SMART_PORT_DB_PORT: "5432"
+      SMART_PORT_DB_NAME: ${POSTGRES_DB}
+      SMART_PORT_DB_USER: ${POSTGRES_USER}
+      SMART_PORT_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      B54D_TASK_TYPE: CPU
+      B54D_THREAD_COUNT: "2"
+      B54D_ITERATIONS: "700"
+      B54D_RANDOM_SEED: "42"
+    ports:
+      - "${MODEL_TRAINER_PORT:-8091}:8091"
+    mem_limit: ${MODEL_TRAINER_MEMORY_LIMIT:-5g}
+    cpus: ${MODEL_TRAINER_CPUS:-2.0}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8091/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    networks:
+      - backend
+
+networks:
+  backend:
+    external: true
+    name: smart-port-backend
