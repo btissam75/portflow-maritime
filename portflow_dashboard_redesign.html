@@ -1,0 +1,363 @@
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    background: linear-gradient(135deg, #0A1428 0%, #0F2847 100%);
+    color: #F8FAFC;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  
+  .dashboard {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  
+  .topbar {
+    background: linear-gradient(135deg, rgba(10,20,40,0.8) 0%, rgba(15,58,95,0.6) 100%);
+    border: 1px solid rgba(0,102,255,0.2);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    backdrop-filter: blur(20px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    animation: slideInDown 0.6s ease-out;
+  }
+  
+  .topbar-title {
+    font-size: 18px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #00D4FF 0%, #0066FF 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .topbar-time {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 14px;
+    color: #A7B0B9;
+  }
+  
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  
+  .card {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(0,102,255,0.15);
+    border-radius: 12px;
+    padding: 20px;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: fadeInUp 0.6s ease-out backwards;
+  }
+  
+  .card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(0,102,255,0.4);
+    box-shadow: 0 20px 40px rgba(0,102,255,0.15);
+  }
+  
+  .card:nth-child(1) { animation-delay: 0.1s; }
+  .card:nth-child(2) { animation-delay: 0.2s; }
+  .card:nth-child(3) { animation-delay: 0.3s; }
+  .card:nth-child(4) { animation-delay: 0.4s; }
+  
+  .metric-card {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: radial-gradient(circle, rgba(0,102,255,0.2) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  
+  .metric-label {
+    font-size: 12px;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  
+  .metric-value {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    position: relative;
+    z-index: 1;
+  }
+  
+  .metric-danger { color: #FF6B6B; }
+  .metric-warning { color: #FFB800; }
+  .metric-success { color: #00FFB3; }
+  .metric-info { color: #00D4FF; }
+  
+  .metric-change {
+    font-size: 13px;
+    color: #A7B0B9;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .trend-up { color: #00FFB3; }
+  .trend-down { color: #FF6B6B; }
+  
+  .status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #A7B0B9;
+    background: rgba(0,255,179,0.1);
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(0,255,179,0.2);
+  }
+  
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #00FFB3;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  
+  .chart-card {
+    grid-column: span 2;
+    min-height: 280px;
+  }
+  
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 2;
+  }
+  
+  .chart-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #F5F7F8;
+  }
+  
+  .chart-subtitle {
+    font-size: 13px;
+    color: #94A3B8;
+    margin-top: 4px;
+  }
+  
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #0066FF, #00D4FF);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    animation: pulse 3s ease-in-out infinite;
+  }
+  
+  .mini-chart {
+    height: 180px;
+    background: linear-gradient(180deg, rgba(0,102,255,0.1) 0%, transparent 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    padding: 12px;
+    gap: 8px;
+  }
+  
+  .bar {
+    width: 12%;
+    background: linear-gradient(180deg, #00D4FF 0%, #0066FF 100%);
+    border-radius: 4px 4px 0 0;
+    transition: all 0.3s ease;
+    position: relative;
+  }
+  
+  .bar:hover {
+    box-shadow: 0 0 20px rgba(0,212,255,0.5);
+    transform: scaleY(1.05);
+  }
+  
+  .bar:nth-child(1) { height: 45%; }
+  .bar:nth-child(2) { height: 65%; }
+  .bar:nth-child(3) { height: 55%; }
+  .bar:nth-child(4) { height: 75%; }
+  .bar:nth-child(5) { height: 85%; }
+  .bar:nth-child(6) { height: 70%; }
+  .bar:nth-child(7) { height: 90%; }
+  .bar:nth-child(8) { height: 60%; }
+  
+  .alerts-container {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  
+  .alert {
+    background: rgba(30, 58, 95, 0.8);
+    border-left: 3px solid;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    animation: slideInLeft 0.5s ease-out backwards;
+  }
+  
+  .alert-critical {
+    border-left-color: #FF6B6B;
+    background: rgba(255,107,107,0.1);
+  }
+  
+  .alert-warning {
+    border-left-color: #FFB800;
+    background: rgba(255,184,0,0.1);
+  }
+  
+  .alert-info {
+    border-left-color: #00D4FF;
+    background: rgba(0,212,255,0.1);
+  }
+  
+  @keyframes slideInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  @media (max-width: 768px) {
+    .chart-card {
+      grid-column: span 1;
+    }
+  }
+</style>
+
+<div class="dashboard">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">PORTFLOW • TANGER MED</div>
+      <div style="font-size: 13px; color: #94A3B8; margin-top: 4px;">Centre de supervision opérationnelle</div>
+    </div>
+    <div style="text-align: right;">
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #77818D;">ven. 14 août</div>
+      <div class="topbar-time" style="font-size: 16px; font-weight: 700; color: #F5F7F8; margin-top: 2px;">14:23</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card metric-card">
+      <div class="metric-label">Risque Critique</div>
+      <div class="metric-value metric-danger">78%</div>
+      <div class="metric-change trend-down">↑ +12% vs 24h</div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">Temps Médian</div>
+      <div class="metric-value metric-info">6.2h</div>
+      <div class="metric-change trend-up">↓ -0.5h vs prévision</div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">Escales Actives</div>
+      <div class="metric-value metric-success">12</div>
+      <div class="metric-change">5 en attente, 7 en cours</div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">Capacité Ports</div>
+      <div class="metric-value metric-warning">84%</div>
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+        <div class="status-indicator">
+          <div class="status-dot"></div>
+          Systèmes actifs
+        </div>
+      </div>
+    </div>
+
+    <div class="card chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Évolution du Risque 24h</div>
+          <div class="chart-subtitle">Tanger Med Port - Données temps réel</div>
+        </div>
+        <div class="badge">EN DIRECT</div>
+      </div>
+      <div class="mini-chart">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+      </div>
+    </div>
+
+    <div class="alerts-container">
+      <div class="card alert alert-critical">
+        <strong>Alerte</strong> Port Est à 92% capacité
+      </div>
+      <div class="card alert alert-warning">
+        <strong>Avertissement</strong> Météo dégradée dans 6h
+      </div>
+      <div class="card alert alert-info">
+        <strong>Info</strong> Synchronisation réussie ✓
+      </div>
+    </div>
+  </div>
+</div>

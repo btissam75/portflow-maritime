@@ -1,0 +1,27 @@
+:root {
+  --portflow-cream: #edf7f9;
+  --portflow-light-blue: #49a7ff;
+  --portflow-coral: #ff6b6b;
+  --portflow-deep-blue: #287cc7;
+  --portflow-sky: #36d6cf;
+  --portflow-teal: #36d6cf;
+  --portflow-deep-red: #ff6b6b;
+  --portflow-page: #06121c;
+  --portflow-map: #082333;
+  --portflow-surface: #0d2230;
+  --portflow-surface-raised: #102937;
+  --portflow-border: #1d3c4b;
+  --portflow-text: #edf7f9;
+  --portflow-text-secondary: #89a7b4;
+  --portflow-display: "Inter", "Segoe UI", sans-serif;
+  --portflow-body: "Inter", "Segoe UI", sans-serif;
+  --portflow-mono: "Inter", "Segoe UI", sans-serif;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  background: radial-gradient(circle at 55% -10%, rgba(30, 92, 116, 0.24) 0%, rgba(8, 25, 37, 0.92) 35%, var(--portflow-page) 72%);
+  color: var(--portflow-text);
+}
