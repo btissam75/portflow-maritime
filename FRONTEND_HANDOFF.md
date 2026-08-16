@@ -5,6 +5,9 @@ page, les contrats de donnees, les interactions deja implementees et les correct
 Il doit etre lu avant toute refonte afin de ne pas confondre une demonstration visuelle avec une
 fonctionnalite reliee au backend.
 
+Pour Prefect, TimescaleDB, MinIO, FastAPI, les pipelines de modelisation et le runbook complet,
+lire ensuite [`TECHNICAL_ARCHITECTURE.md`](./TECHNICAL_ARCHITECTURE.md).
+
 ## 1. Objectif du sous-projet
 
 PortFlow Maritime est une tour de controle destinee a un operateur ou superviseur de Tanger Med.

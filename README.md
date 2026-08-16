@@ -11,6 +11,12 @@ React control tower for maritime supervision and decision support at Tanger Med.
 The visual rules, typography, color tokens and component conventions are documented in
 [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md).
 
+Detailed handoff documentation:
+
+- [`FRONTEND_HANDOFF.md`](./FRONTEND_HANDOFF.md): pages, interactions and frontend limitations
+- [`TECHNICAL_ARCHITECTURE.md`](./TECHNICAL_ARCHITECTURE.md): Prefect, TimescaleDB, MinIO,
+  FastAPI, modeling, governance and deployment
+
 ## Stack
 
 - React 18 and TypeScript
