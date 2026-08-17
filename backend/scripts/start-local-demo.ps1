@@ -1,6 +1,8 @@
 param(
     [int]$Port = 8092,
-    [switch]$SkipInstall
+    [switch]$SkipInstall,
+    [string]$ModelBundlePath = "",
+    [switch]$EnableModelLive
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,7 +34,7 @@ if (-not (Test-Path -LiteralPath $VirtualPython)) {
 }
 
 if (-not $SkipInstall) {
-    & $VirtualPython -c "import fastapi, uvicorn, psycopg2, pydantic" 2>$null
+    & $VirtualPython -c "import fastapi, uvicorn, psycopg2, pydantic, catboost" 2>$null
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Installation des dependances de l'API..."
         & $VirtualPython -m pip install --disable-pip-version-check -r $Requirements
@@ -41,10 +43,29 @@ if (-not $SkipInstall) {
 
 $env:SMART_PORT_LOCAL_DEMO_MODE = "true"
 $env:B56F_CORS_ORIGINS = "http://localhost:3000,http://localhost:4173,http://localhost:8088"
+$env:PORTFLOW_MODEL_MANIFEST = "manifest.json"
+$env:PORTFLOW_MODEL_LIVE_ENABLED = if ($EnableModelLive) { "true" } else { "false" }
+$env:PORTFLOW_SOURCE_FRESHNESS_LIMIT_HOURS = "2"
+
+if ([string]::IsNullOrWhiteSpace($ModelBundlePath)) {
+    $ModelBundlePath = Join-Path $BackendRoot "model_bundle\runtime"
+}
+
+$ResolvedModelBundlePath = [System.IO.Path]::GetFullPath($ModelBundlePath)
+$ModelManifestPath = Join-Path $ResolvedModelBundlePath $env:PORTFLOW_MODEL_MANIFEST
+if (Test-Path -LiteralPath $ModelManifestPath -PathType Leaf) {
+    $env:PORTFLOW_MODEL_BUNDLE_DIR = $ResolvedModelBundlePath
+    $ModelServingMessage = "Bundle detecte : $ResolvedModelBundlePath"
+}
+else {
+    $env:PORTFLOW_MODEL_BUNDLE_DIR = ""
+    $ModelServingMessage = "Non raccorde : manifest.json absent dans $ResolvedModelBundlePath"
+}
 
 Write-Host ""
 Write-Host "PortFlow API locale : http://localhost:$Port"
 Write-Host "Mode               : LOCAL DEMO / SHADOW (aucune revendication production)"
+Write-Host "Modeles            : $ModelServingMessage"
 Write-Host "Documentation      : http://localhost:$Port/docs"
 Write-Host "Arret               : Ctrl+C"
 Write-Host ""
@@ -56,4 +77,3 @@ Set-Location $BackendRoot
     --port $Port `
     --reload `
     --reload-dir (Join-Path $BackendRoot "services\platform_api")
-

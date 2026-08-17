@@ -16,6 +16,12 @@ services:
       SMART_PORT_DB_PASSWORD: ${POSTGRES_PASSWORD}
       B56F_CORS_ORIGINS: http://localhost:${MARITIME_PLATFORM_PORT:-8088}
       B56F_DB_POOL_SIZE: "8"
+      PORTFLOW_MODEL_BUNDLE_DIR: /opt/smart-port/model-bundle
+      PORTFLOW_MODEL_MANIFEST: ${PORTFLOW_MODEL_MANIFEST:-manifest.json}
+      PORTFLOW_MODEL_LIVE_ENABLED: ${PORTFLOW_MODEL_LIVE_ENABLED:-false}
+      PORTFLOW_SOURCE_FRESHNESS_LIMIT_HOURS: ${PORTFLOW_SOURCE_FRESHNESS_LIMIT_HOURS:-2}
+    volumes:
+      - ${PORTFLOW_MODEL_BUNDLE_HOST_PATH:-./model_bundle/runtime}:/opt/smart-port/model-bundle:ro
     ports:
       - "${PLATFORM_API_PORT:-8092}:8092"
     healthcheck:

@@ -1,0 +1,85 @@
+{
+  "bundle_id": "b48r-production-candidate-YYYYMMDD",
+  "created_at": "2026-08-17T00:00:00Z",
+  "source_max_time": "2026-04-22T10:00:00Z",
+  "promotion_status": "VALIDATED",
+  "training_run": "E0_STRICT_PASS_B48R",
+  "git_commit": null,
+  "scientific_limits": [
+    "Historical benchmark frozen by E0-A",
+    "Exact checkpoint lineage and feature order recovered by E0-B",
+    "Live serving is forbidden before fresh-forward validation"
+  ],
+  "artifacts": [
+    {
+      "role": "B36B_MAE",
+      "source_path": "/content/drive/MyDrive/TIR/BLOCK36B_STRICT_HISTORY_BACKLOG_CATBOOST/models/B36B_FINAL_MAE.cbm",
+      "task": "regression",
+      "prediction_kind": "scalar",
+      "output_transform": "identity"
+    },
+    {
+      "role": "B36B_RMSE",
+      "source_path": "/content/drive/MyDrive/TIR/BLOCK36B_STRICT_HISTORY_BACKLOG_CATBOOST/models/B36B_FINAL_RMSE.cbm",
+      "task": "regression",
+      "prediction_kind": "scalar",
+      "output_transform": "identity"
+    },
+    {
+      "role": "B36C_GE12",
+      "source_path": "/content/drive/MyDrive/TIR/BLOCK36C_LONG_RISK_CORRECTOR_ANALYSIS_V2/models/b36c_RISK_GE12.cbm",
+      "task": "classification",
+      "prediction_kind": "probability_positive",
+      "output_transform": "identity"
+    },
+    {
+      "role": "B36C_GE24",
+      "source_path": "/content/drive/MyDrive/TIR/BLOCK36C_LONG_RISK_CORRECTOR_ANALYSIS_V2/models/b36c_RISK_GE24.cbm",
+      "task": "classification",
+      "prediction_kind": "probability_positive",
+      "output_transform": "identity"
+    },
+    {
+      "role": "B36C_GE36",
+      "source_path": "/content/drive/MyDrive/TIR/BLOCK36C_LONG_RISK_CORRECTOR_ANALYSIS_V2/models/b36c_RISK_GE36.cbm",
+      "task": "classification",
+      "prediction_kind": "probability_positive",
+      "output_transform": "identity"
+    },
+    {
+      "role": "B44_Q50",
+      "source_path": "/content/drive/MyDrive/TIR/BLOCK44_QUANTILE_ETA_LAYER_B36B_B36C/models/b44_residual_quantile_alpha_0_5.cbm",
+      "task": "regression",
+      "prediction_kind": "scalar",
+      "output_transform": "add_b36b"
+    },
+    {
+      "role": "B44_Q80",
+      "source_path": "/content/drive/MyDrive/TIR/BLOCK44_QUANTILE_ETA_LAYER_B36B_B36C/models/b44_residual_quantile_alpha_0_8.cbm",
+      "task": "regression",
+      "prediction_kind": "scalar",
+      "output_transform": "add_b36b"
+    },
+    {
+      "role": "B44_Q95",
+      "source_path": "/content/drive/MyDrive/TIR/BLOCK44_QUANTILE_ETA_LAYER_B36B_B36C/models/b44_residual_quantile_alpha_0_95.cbm",
+      "task": "regression",
+      "prediction_kind": "scalar",
+      "output_transform": "add_b36b"
+    },
+    {
+      "role": "B48_GATE",
+      "source_path": "/content/drive/MyDrive/TIR/BLOCK48_MIXTURE_OF_EXPERTS_B36B_B36C_B44/models/b48_gate_classifier.cbm",
+      "task": "classification",
+      "prediction_kind": "probability_vector",
+      "output_transform": "identity"
+    },
+    {
+      "role": "B48_META",
+      "source_path": "/content/drive/MyDrive/TIR/BLOCK48_MIXTURE_OF_EXPERTS_B36B_B36C_B44/models/b48_meta_stacker_regressor.cbm",
+      "task": "regression",
+      "prediction_kind": "scalar",
+      "output_transform": "identity"
+    }
+  ]
+}

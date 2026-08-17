@@ -17,11 +17,13 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import IconifyIcon from 'components/base/IconifyIcon';
 import ControlTowerForecastChart from 'components/control-tower/ControlTowerForecastChart';
 import ControlTowerProcessBoard from 'components/control-tower/ControlTowerProcessBoard';
 import InternalPortMap from 'components/control-tower/InternalPortMap';
 import MaritimeApproachMap from 'components/control-tower/MaritimeApproachMap';
+import PortOperationsGIS from 'components/control-tower/PortOperationsGIS';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import paths from 'routes/paths';
@@ -502,6 +504,96 @@ const UnitQueueCard = ({
   );
 };
 
+const UnitQueueTable = ({
+  units,
+  selectedId,
+  onSelect,
+}: {
+  units: TowerUnit[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) => {
+  const columns: GridColDef<TowerUnit>[] = [
+    {
+      field: 'tier',
+      headerName: 'Priorité',
+      width: 105,
+      renderCell: ({ row }) => (
+        <Chip
+          size="small"
+          label={row.tier}
+          sx={{ height: 20, color: tierTone[row.tier], fontSize: 7, fontWeight: 900 }}
+        />
+      ),
+    },
+    { field: 'unit_id', headerName: 'Unité', minWidth: 145, flex: 0.85 },
+    { field: 'stage_label', headerName: 'Zone actuelle', minWidth: 105, flex: 0.6 },
+    {
+      field: 'eta_p50_h',
+      headerName: 'ETA P50',
+      width: 86,
+      valueFormatter: (value: number) => `${value.toFixed(1)} h`,
+    },
+    {
+      field: 'eta_p90_h',
+      headerName: 'ETA P90',
+      width: 88,
+      valueFormatter: (value: number) => `${value.toFixed(1)} h`,
+    },
+    {
+      field: 'ge24',
+      headerName: 'Risque ≥24 h',
+      width: 110,
+      valueFormatter: (value: number) => `${Math.round(value * 100)} %`,
+    },
+    { field: 'route', headerName: 'Route', width: 82 },
+    {
+      field: 'location_age_minutes',
+      headerName: 'Fraîcheur',
+      width: 90,
+      valueFormatter: (value: number) => `${value} min`,
+    },
+    {
+      field: 'confidence',
+      headerName: 'Confiance',
+      width: 92,
+      valueFormatter: (value: number) => `${Math.round(value * 100)} %`,
+    },
+    { field: 'assignee', headerName: 'Responsable', minWidth: 130, flex: 0.7 },
+  ];
+
+  return (
+    <Box sx={{ height: 660, width: '100%' }}>
+      <DataGrid
+        rows={units}
+        columns={columns}
+        getRowId={(row) => row.unit_id}
+        rowSelectionModel={selectedId ? [selectedId] : []}
+        onRowClick={({ row }) => onSelect(row.unit_id)}
+        disableColumnMenu
+        disableMultipleRowSelection
+        pageSizeOptions={[25, 50, 100]}
+        initialState={{ pagination: { paginationModel: { pageSize: 25, page: 0 } } }}
+        sx={{
+          border: 0,
+          color: pf.text.primary,
+          fontSize: 9,
+          '& .MuiDataGrid-columnHeaders': {
+            bgcolor: '#061721',
+            color: '#89A8B4',
+            borderBottomColor: '#174453',
+          },
+          '& .MuiDataGrid-cell': { borderBottomColor: '#123845' },
+          '& .MuiDataGrid-row': { cursor: 'pointer' },
+          '& .MuiDataGrid-row:hover': { bgcolor: '#0B2A36' },
+          '& .MuiDataGrid-row.Mui-selected': { bgcolor: `${pf.functional.cyan}12` },
+          '& .MuiDataGrid-footerContainer': { borderTopColor: '#174453' },
+        }}
+      />
+    </Box>
+  );
+};
+
 const UnitDetailPanel = ({
   detail,
   loading,
@@ -672,62 +764,87 @@ const OverviewView = ({
   snapshot,
   selectedStage,
   setSelectedStage,
-  selectedUnit,
-  setSelectedUnit,
   onOpenDecision,
 }: {
   snapshot: ControlTowerSnapshot;
   selectedStage: string;
   setSelectedStage: (value: string) => void;
-  selectedUnit: string;
-  setSelectedUnit: (value: string) => void;
   onOpenDecision: (alert: TowerAlert) => void;
 }) => {
   const [twinView, setTwinView] = useState<'PORT' | 'APPROACH' | 'FLOW'>('PORT');
   const [evidence, setEvidence] = useState('');
-  const zre = snapshot.stages.find((stage) => stage.code === 'ZRE') ?? snapshot.stages[0];
-  const terminal = snapshot.stages.find((stage) => stage.code === 'TERMINAL') ?? snapshot.stages[0];
-  const h6 = snapshot.forecast.find((point) => point.horizon_h === 6) ?? snapshot.forecast[0];
+  const bottleneck = snapshot.stages.reduce((highest, stage) =>
+    stage.occupancy_pct > highest.occupancy_pct ? stage : highest,
+  );
+  const focusedStage = snapshot.stages.find((stage) => stage.code === selectedStage) ?? bottleneck;
+  const focusedAlert =
+    snapshot.alerts.find((alert) => alert.alert_id === evidence) ?? snapshot.alerts[0];
+  const h6Pressure = Math.round((bottleneck.forecast.h6 / bottleneck.capacity) * 100);
+  const meanConfidence = Math.round(
+    (snapshot.units.reduce((total, unit) => total + unit.confidence, 0) /
+      Math.max(snapshot.units.length, 1)) *
+      100,
+  );
+  const potentialGain = Math.max(
+    0,
+    ...snapshot.recommendations.map((item) => item.expected_gain_h),
+  );
   const executiveMetrics = [
     {
-      label: 'Arrivées ZRE · H6',
-      value: zre.forecast.h6,
-      unit: 'unités',
-      note: `P10 ${Math.max(0, zre.forecast.h6 - 19)} · P90 ${zre.forecast.h6 + 27}`,
-      icon: 'lucide:log-in',
-      color: pf.text.primary,
-    },
-    {
-      label: 'Charge portuaire',
+      label: 'Backlog portuaire',
       value: snapshot.metrics.active_units.toLocaleString('fr-FR'),
       unit: 'unités',
-      note: `+${Math.max(1, snapshot.metrics.at_risk_units)} sous vigilance`,
+      note: `${snapshot.metrics.at_risk_units} sous vigilance`,
       icon: 'lucide:boxes',
       color: pf.text.primary,
     },
     {
-      label: 'Occupation terminal',
-      value: Math.round(terminal.occupancy_pct),
+      label: 'Goulot actuel',
+      value: bottleneck.label,
+      unit: '',
+      note: `${Math.round(bottleneck.occupancy_pct)} % occupé`,
+      icon: 'lucide:octagon-alert',
+      color: bottleneck.occupancy_pct >= 95 ? pf.functional.red : pf.functional.amber,
+    },
+    {
+      label: 'Risque à H+6',
+      value: h6Pressure,
       unit: '%',
-      note: 'Seuil d’attention · 80 %',
-      icon: 'lucide:warehouse',
-      color: terminal.occupancy_pct >= 80 ? pf.functional.amber : pf.functional.green,
+      note: `${bottleneck.forecast.h6} / ${bottleneck.capacity} unités`,
+      icon: 'lucide:chart-no-axes-combined',
+      color: h6Pressure >= 95 ? pf.functional.red : pf.functional.amber,
     },
     {
-      label: 'Embarquements · H6',
-      value: h6.departures,
+      label: 'Unités impactées',
+      value: snapshot.metrics.at_risk_units,
       unit: 'unités',
-      note: `Intervalle estimé ${Math.max(0, h6.departures - 18)}–${h6.departures + 21}`,
-      icon: 'lucide:ship',
-      color: pf.text.primary,
+      note: `${snapshot.metrics.ge36_units} à risque ≥ 36 h`,
+      icon: 'lucide:container',
+      color: pf.functional.red,
     },
     {
-      label: 'Décisions à examiner',
+      label: 'Décisions urgentes',
       value: snapshot.metrics.pending_decisions,
       unit: '',
-      note: `${snapshot.alerts.filter((alert) => alert.severity === 'CRITIQUE').length || 1} priorité opérationnelle`,
+      note: `${snapshot.alerts.filter((alert) => alert.severity === 'CRITIQUE').length} alerte critique`,
       icon: 'lucide:list-checks',
       color: pf.functional.amber,
+    },
+    {
+      label: 'Gain potentiel',
+      value: `−${potentialGain.toFixed(1)}`,
+      unit: 'h',
+      note: `${snapshot.recommendations[0]?.beneficiary_units ?? 0} bénéficiaires`,
+      icon: 'lucide:trending-down',
+      color: pf.functional.green,
+    },
+    {
+      label: 'Confiance moyenne',
+      value: meanConfidence,
+      unit: '%',
+      note: snapshot.model_serving?.ready ? 'Bundle validé' : 'Moteur non raccordé',
+      icon: 'lucide:badge-check',
+      color: snapshot.model_serving?.ready ? pf.functional.green : pf.functional.amber,
     },
   ];
 
@@ -736,7 +853,12 @@ const OverviewView = ({
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)', lg: 'repeat(3,1fr)' },
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(2,1fr)',
+            lg: 'repeat(4,1fr)',
+            xl: 'repeat(7,1fr)',
+          },
           gap: 1,
         }}
       >
@@ -745,9 +867,8 @@ const OverviewView = ({
             key={metric.label}
             sx={{
               ...panelSx,
-              minHeight: 118,
-              p: 1.6,
-              gridColumn: { lg: index >= 3 ? 'span 1' : 'auto' },
+              minHeight: 104,
+              p: 1.35,
               transition: 'transform 180ms ease, border-color 180ms ease',
               '&:hover': { transform: 'translateY(-3px)', borderColor: '#2D6678' },
             }}
@@ -760,7 +881,7 @@ const OverviewView = ({
               <Typography
                 sx={{
                   color: metric.color,
-                  fontSize: 27,
+                  fontSize: 24,
                   fontWeight: 850,
                   letterSpacing: '-.035em',
                 }}
@@ -780,85 +901,166 @@ const OverviewView = ({
         ))}
       </Box>
 
-      <Paper sx={{ ...panelSx, p: 0, overflow: 'hidden' }}>
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          alignItems={{ sm: 'center' }}
-          gap={1}
-          sx={{ px: 1.8, py: 1.25, borderBottom: '1px solid #174453' }}
-        >
-          <Stack direction="row" alignItems="center" gap={0.8}>
-            <IconifyIcon
-              icon="lucide:map-pinned"
-              sx={{ color: pf.functional.cyan, fontSize: 18 }}
-            />
-            <Typography sx={{ color: pf.text.primary, fontSize: 13, fontWeight: 850 }}>
-              Jumeau numérique opérationnel
-            </Typography>
-            <Typography sx={{ color: '#6F929F', fontSize: 8.5 }}>· vue schématique</Typography>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 2.25fr) minmax(280px, .75fr)' },
+          gap: 1.2,
+          alignItems: 'stretch',
+        }}
+      >
+        <Paper sx={{ ...panelSx, p: 0, overflow: 'hidden', minWidth: 0 }}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            alignItems={{ sm: 'center' }}
+            gap={1}
+            sx={{ px: 1.8, py: 1.25, borderBottom: '1px solid #174453' }}
+          >
+            <Stack direction="row" alignItems="center" gap={0.8}>
+              <IconifyIcon
+                icon="lucide:map-pinned"
+                sx={{ color: pf.functional.cyan, fontSize: 18 }}
+              />
+              <Typography sx={{ color: pf.text.primary, fontSize: 13, fontWeight: 850 }}>
+                Jumeau numérique opérationnel
+              </Typography>
+              <Typography sx={{ color: '#6F929F', fontSize: 8.5 }}>
+                · SIG interactif · situation opérationnelle
+              </Typography>
+            </Stack>
+            <Stack
+              direction="row"
+              gap={0.35}
+              ml={{ sm: 'auto' }}
+              sx={{ p: 0.35, bgcolor: '#061721', border: '1px solid #174453', borderRadius: '9px' }}
+            >
+              {(
+                [
+                  ['PORT', 'Port'],
+                  ['APPROACH', 'Approche'],
+                  ['FLOW', 'Flux'],
+                ] as const
+              ).map(([value, label]) => (
+                <Button
+                  key={value}
+                  onClick={() => setTwinView(value)}
+                  sx={{
+                    minWidth: 64,
+                    minHeight: 30,
+                    color: twinView === value ? '#06141D' : '#6F929F',
+                    bgcolor: twinView === value ? '#5BA7BC' : 'transparent',
+                    borderRadius: '7px',
+                    fontSize: 8.5,
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
+            </Stack>
           </Stack>
+          {twinView === 'PORT' && (
+            <PortOperationsGIS
+              stages={snapshot.stages}
+              units={snapshot.units}
+              vessels={snapshot.vessels}
+              selectedStage={selectedStage}
+              onStageSelect={setSelectedStage}
+            />
+          )}
+          {twinView === 'APPROACH' && (
+            <MaritimeApproachMap
+              vessels={snapshot.vessels}
+              selected={snapshot.vessels[0]?.vessel_id}
+              onSelect={() => undefined}
+            />
+          )}
+          {twinView === 'FLOW' && (
+            <Box sx={{ p: 1.4 }}>
+              <ControlTowerProcessBoard
+                stages={snapshot.stages}
+                selected={selectedStage}
+                onSelect={setSelectedStage}
+                horizon={6}
+              />
+              <ControlTowerForecastChart data={snapshot.forecast} height={290} />
+            </Box>
+          )}
+        </Paper>
+
+        <Paper sx={{ ...panelSx, p: 0, overflow: 'hidden' }}>
           <Stack
             direction="row"
-            gap={0.35}
-            ml={{ sm: 'auto' }}
-            sx={{ p: 0.35, bgcolor: '#061721', border: '1px solid #174453', borderRadius: '9px' }}
+            alignItems="center"
+            sx={{ px: 1.6, py: 1.25, borderBottom: '1px solid #174453' }}
           >
-            {(
-              [
-                ['PORT', 'Port'],
-                ['APPROACH', 'Approche'],
-                ['FLOW', 'Flux'],
-              ] as const
-            ).map(([value, label]) => (
-              <Button
-                key={value}
-                onClick={() => setTwinView(value)}
-                sx={{
-                  minWidth: 64,
-                  minHeight: 30,
-                  color: twinView === value ? '#06141D' : '#6F929F',
-                  bgcolor: twinView === value ? '#5BA7BC' : 'transparent',
-                  borderRadius: '7px',
-                  fontSize: 8.5,
-                }}
-              >
-                {label}
-              </Button>
-            ))}
-          </Stack>
-        </Stack>
-        {twinView === 'PORT' && (
-          <InternalPortMap
-            stages={snapshot.stages}
-            units={snapshot.units}
-            vessels={snapshot.vessels}
-            selectedStage={selectedStage}
-            selectedUnit={selectedUnit}
-            onStageSelect={setSelectedStage}
-            onUnitSelect={setSelectedUnit}
-            riskOnly={false}
-            onRiskOnlyChange={() => undefined}
-          />
-        )}
-        {twinView === 'APPROACH' && (
-          <MaritimeApproachMap
-            vessels={snapshot.vessels}
-            selected={snapshot.vessels[0]?.vessel_id}
-            onSelect={() => undefined}
-          />
-        )}
-        {twinView === 'FLOW' && (
-          <Box sx={{ p: 1.4 }}>
-            <ControlTowerProcessBoard
-              stages={snapshot.stages}
-              selected={selectedStage}
-              onSelect={setSelectedStage}
-              horizon={6}
+            <IconifyIcon icon="lucide:radar" sx={{ color: pf.functional.cyan, fontSize: 17 }} />
+            <Typography sx={{ ml: 0.8, color: pf.text.primary, fontSize: 12, fontWeight: 850 }}>
+              Situation opérationnelle
+            </Typography>
+            <Chip
+              size="small"
+              label={snapshot.mode === 'LIVE' ? 'TEMPS RÉEL' : 'REJEU'}
+              sx={{ ml: 'auto', height: 20, fontSize: 7, color: pf.functional.amber }}
             />
-            <ControlTowerForecastChart data={snapshot.forecast} height={290} />
-          </Box>
-        )}
-      </Paper>
+          </Stack>
+          <Stack gap={1.1} p={1.35}>
+            <Box sx={{ p: 1.2, bgcolor: '#061721', borderRadius: '10px' }}>
+              <Typography sx={{ color: '#648895', fontSize: 7.5, fontWeight: 900 }}>
+                ZONE SÉLECTIONNÉE
+              </Typography>
+              <Stack direction="row" alignItems="baseline" mt={0.45}>
+                <Typography sx={{ color: pf.text.primary, fontSize: 20, fontWeight: 850 }}>
+                  {focusedStage.label}
+                </Typography>
+                <Typography
+                  sx={{ ml: 'auto', color: pf.functional.amber, fontSize: 17, fontWeight: 850 }}
+                >
+                  {Math.round(focusedStage.occupancy_pct)} %
+                </Typography>
+              </Stack>
+              <LinearProgress
+                variant="determinate"
+                value={Math.min(100, focusedStage.occupancy_pct)}
+                sx={{ mt: 0.8, height: 5, borderRadius: 3 }}
+              />
+            </Box>
+            {[
+              ['Maintenant', `${focusedStage.units} / ${focusedStage.capacity} unités`],
+              ['Projection H+6', `${focusedStage.forecast.h6} unités`],
+              ['Séjour P90', `${focusedStage.dwell_p90_h.toFixed(1)} h`],
+              ['Unités bloquées', focusedStage.blocked.toString()],
+            ].map(([label, value]) => (
+              <Stack key={label} direction="row" alignItems="center" sx={{ px: 0.4 }}>
+                <Typography sx={{ color: '#7899A5', fontSize: 8.5 }}>{label}</Typography>
+                <Typography
+                  sx={{ ml: 'auto', color: pf.text.primary, fontSize: 9, fontWeight: 800 }}
+                >
+                  {value}
+                </Typography>
+              </Stack>
+            ))}
+            <Divider sx={{ borderColor: '#174453' }} />
+            <Typography sx={{ color: '#648895', fontSize: 7.5, fontWeight: 900 }}>
+              PROCHAINE ACTION RECOMMANDÉE
+            </Typography>
+            <Typography sx={{ color: pf.text.primary, fontSize: 10.5, fontWeight: 750 }}>
+              {snapshot.alerts[0]?.recommendation}
+            </Typography>
+            <Typography sx={{ color: '#7899A5', fontSize: 8 }}>
+              Échéance {snapshot.alerts[0] ? formatDateTime(snapshot.alerts[0].deadline_at) : '—'} ·{' '}
+              décision humaine requise
+            </Typography>
+            <Button
+              component={Link}
+              to={paths.decisions}
+              endIcon={<IconifyIcon icon="lucide:arrow-right" />}
+              sx={{ mt: 'auto', color: pf.functional.cyan, border: '1px solid #245566' }}
+            >
+              Ouvrir le poste de décision
+            </Button>
+          </Stack>
+        </Paper>
+      </Box>
 
       <Paper sx={{ ...panelSx, p: 0, overflow: 'hidden' }}>
         <Stack
@@ -874,111 +1076,128 @@ const OverviewView = ({
             classées par impact
           </Typography>
         </Stack>
-        <Stack gap={1} p={1.5}>
-          {snapshot.alerts.map((alert, index) => {
-            const recommendation =
-              snapshot.recommendations[index % snapshot.recommendations.length];
-            const color =
-              index === 0 ? pf.functional.amber : index === 1 ? '#58B9F6' : pf.functional.cyan;
-            const expanded = evidence === alert.alert_id;
-            return (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', lg: 'minmax(250px,.65fr) minmax(0,1.35fr)' },
+            minHeight: 330,
+          }}
+        >
+          <Stack sx={{ p: 1, borderRight: { lg: '1px solid #174453' } }}>
+            {snapshot.alerts.map((alert, index) => {
+              const selected = focusedAlert?.alert_id === alert.alert_id;
+              const color = alertTone[alert.severity];
+              return (
+                <ButtonBase
+                  key={alert.alert_id}
+                  onClick={() => setEvidence(alert.alert_id)}
+                  sx={{
+                    width: '100%',
+                    p: 1.15,
+                    gap: 1,
+                    textAlign: 'left',
+                    alignItems: 'flex-start',
+                    borderRadius: '9px',
+                    border: `1px solid ${selected ? `${color}85` : 'transparent'}`,
+                    bgcolor: selected ? `${color}0d` : 'transparent',
+                    '&:hover': { bgcolor: '#0B2733' },
+                  }}
+                >
+                  <Box
+                    sx={{ width: 8, height: 8, mt: 0.45, borderRadius: '50%', bgcolor: color }}
+                  />
+                  <Box minWidth={0} flex={1}>
+                    <Stack direction="row">
+                      <Typography sx={{ color: '#648895', fontSize: 7.5, fontWeight: 900 }}>
+                        PRIORITÉ {String(index + 1).padStart(2, '0')}
+                      </Typography>
+                      <Typography sx={{ ml: 'auto', color: '#648895', fontSize: 7.5 }}>
+                        {formatDateTime(alert.deadline_at)}
+                      </Typography>
+                    </Stack>
+                    <Typography
+                      sx={{ color: pf.text.primary, fontSize: 9.5, fontWeight: 780, mt: 0.45 }}
+                    >
+                      {alert.title}
+                    </Typography>
+                    <Typography sx={{ color: '#7899A5', fontSize: 8, mt: 0.25 }} noWrap>
+                      {alert.unit_ids.length} unités · confiance{' '}
+                      {Math.round(alert.confidence * 100)} %
+                    </Typography>
+                  </Box>
+                </ButtonBase>
+              );
+            })}
+          </Stack>
+          {focusedAlert && (
+            <Stack p={{ xs: 1.3, sm: 1.7 }} gap={1.1}>
+              <Stack direction="row" alignItems="center">
+                <Chip
+                  size="small"
+                  label={focusedAlert.severity}
+                  sx={{ color: alertTone[focusedAlert.severity], fontSize: 7 }}
+                />
+                <Typography sx={{ ml: 'auto', color: '#7899A5', fontSize: 8 }}>
+                  Confiance {Math.round(focusedAlert.confidence * 100)} %
+                </Typography>
+              </Stack>
+              <Typography sx={{ color: pf.text.primary, fontSize: 15, fontWeight: 850 }}>
+                {focusedAlert.recommendation}
+              </Typography>
+              <Typography sx={{ color: '#83A2AE', fontSize: 9.5 }}>
+                {focusedAlert.message}
+              </Typography>
               <Box
-                key={alert.alert_id}
                 sx={{
-                  p: 1.45,
-                  bgcolor: '#081E29',
-                  border: `1px solid ${index === 0 ? `${color}90` : '#174453'}`,
-                  borderRadius: '11px',
-                  boxShadow: index === 0 ? `0 0 28px ${color}0b` : 'none',
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(3,1fr)' },
+                  gap: 0.8,
                 }}
               >
-                <Stack direction="row" alignItems="center">
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color }} />
-                  <Typography sx={{ ml: 0.65, color: '#87A5B1', fontSize: 8, fontWeight: 900 }}>
-                    PRIORITÉ {String(index + 1).padStart(2, '0')}
-                  </Typography>
-                  <Typography sx={{ ml: 'auto', color: '#87A5B1', fontSize: 8 }}>
-                    Confiance {Math.round(alert.confidence * 100)} %
-                  </Typography>
-                </Stack>
-                <Typography sx={{ color: pf.text.primary, fontSize: 13, fontWeight: 850, mt: 1 }}>
-                  {alert.recommendation}
-                </Typography>
-                <Typography sx={{ color: '#83A2AE', fontSize: 9.5, mt: 0.35 }}>
-                  {alert.cause}
-                </Typography>
-                <Divider sx={{ my: 1.05, borderColor: '#174453' }} />
-                <Stack direction={{ xs: 'column', sm: 'row' }} gap={2.2}>
-                  <Box>
-                    <Typography sx={{ color: '#648895', fontSize: 7.5 }}>
-                      UNITÉS CONCERNÉES
+                {[
+                  ['Exposition', `${focusedAlert.unit_ids.length} unités`],
+                  ['Probabilité', `${Math.round(focusedAlert.probability * 100)} %`],
+                  ['Agir avant', formatDateTime(focusedAlert.deadline_at)],
+                ].map(([label, value]) => (
+                  <Box key={label} sx={{ p: 1, bgcolor: '#061721', borderRadius: '8px' }}>
+                    <Typography sx={{ color: '#648895', fontSize: 7 }}>
+                      {label.toUpperCase()}
                     </Typography>
-                    <Typography sx={{ color: pf.functional.green, fontSize: 11, fontWeight: 800 }}>
-                      {alert.unit_ids.length}
+                    <Typography
+                      sx={{ color: pf.text.primary, fontSize: 10, fontWeight: 800, mt: 0.3 }}
+                    >
+                      {value}
                     </Typography>
                   </Box>
-                  <Box>
-                    <Typography sx={{ color: '#648895', fontSize: 7.5 }}>
-                      GAIN ETA ATTENDU
-                    </Typography>
-                    <Typography sx={{ color: pf.functional.green, fontSize: 11, fontWeight: 800 }}>
-                      −{recommendation?.expected_gain_h ?? 1.4} h
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography sx={{ color: '#648895', fontSize: 7.5 }}>AGIR AVANT</Typography>
-                    <Typography sx={{ color, fontSize: 11, fontWeight: 800 }}>
-                      {formatDateTime(alert.deadline_at)}
-                    </Typography>
-                  </Box>
-                </Stack>
-                {expanded && (
-                  <Box sx={{ mt: 1, p: 1, bgcolor: '#061721', borderRadius: '8px' }}>
-                    <Typography sx={{ color: pf.functional.cyan, fontSize: 8, fontWeight: 900 }}>
-                      PREUVES DISPONIBLES
-                    </Typography>
-                    <Typography sx={{ color: '#8BA8B3', fontSize: 8.5, mt: 0.35 }}>
-                      {alert.message} Impact : {alert.impact}
-                    </Typography>
-                  </Box>
-                )}
-                <Stack direction="row" gap={0.7} mt={1.15}>
-                  <Button
-                    component={Link}
-                    to={paths.simulation}
-                    startIcon={<IconifyIcon icon="lucide:play" />}
-                    sx={{
-                      color: '#06141D',
-                      bgcolor: pf.functional.cyan,
-                      borderRadius: '8px',
-                      fontSize: 8.5,
-                      '&:hover': { bgcolor: '#72E6DC' },
-                    }}
-                  >
-                    Simuler
-                  </Button>
-                  <Button
-                    onClick={() => setEvidence(expanded ? '' : alert.alert_id)}
-                    sx={{
-                      color: '#A8C0C9',
-                      border: '1px solid #245566',
-                      borderRadius: '8px',
-                      fontSize: 8.5,
-                    }}
-                  >
-                    {expanded ? 'Masquer' : 'Voir les preuves'}
-                  </Button>
-                  <Button
-                    onClick={() => onOpenDecision(alert)}
-                    sx={{ ml: { sm: 'auto' }, color, fontSize: 8.5 }}
-                  >
-                    Ouvrir une décision
-                  </Button>
-                </Stack>
+                ))}
               </Box>
-            );
-          })}
-        </Stack>
+              <Box sx={{ p: 1.1, bgcolor: '#061721', borderRadius: '9px' }}>
+                <Typography sx={{ color: pf.functional.cyan, fontSize: 7.5, fontWeight: 900 }}>
+                  CAUSE ET IMPACT
+                </Typography>
+                <Typography sx={{ color: '#8BA8B3', fontSize: 8.5, mt: 0.4 }}>
+                  {focusedAlert.cause} {focusedAlert.impact}
+                </Typography>
+              </Box>
+              <Stack direction={{ xs: 'column', sm: 'row' }} gap={0.7} mt="auto">
+                <Button
+                  component={Link}
+                  to={paths.simulation}
+                  startIcon={<IconifyIcon icon="lucide:play" />}
+                  sx={{ color: '#06141D', bgcolor: pf.functional.cyan }}
+                >
+                  Simuler l’action
+                </Button>
+                <Button
+                  onClick={() => onOpenDecision(focusedAlert)}
+                  sx={{ color: pf.functional.cyan, border: '1px solid #245566' }}
+                >
+                  Créer et affecter la décision
+                </Button>
+              </Stack>
+            </Stack>
+          )}
+        </Box>
       </Paper>
     </Stack>
   );
@@ -1100,90 +1319,189 @@ const DecisionsView = ({
   decisions: TowerDecision[];
   busyId: string;
   onAdvance: (decision: TowerDecision) => void;
-}) => (
-  <Box
-    sx={{
-      display: 'grid',
-      gridTemplateColumns: { xs: '1fr', md: 'repeat(3,1fr)', xl: 'repeat(6,1fr)' },
-      gap: 0.8,
-      alignItems: 'start',
-    }}
-  >
-    {decisionStatuses.map((status, statusIndex) => {
-      const rows = decisions.filter((item) => item.status === status);
-      const color = [
-        pf.functional.amber,
-        pf.functional.blue,
-        pf.functional.purple,
-        pf.functional.cyan,
-        pf.functional.green,
-        pf.text.tertiary,
-      ][statusIndex];
-      return (
-        <Paper key={status} sx={{ ...panelSx, p: 1, minHeight: 270 }}>
-          <Stack direction="row" alignItems="center" mb={1}>
-            <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: color }} />
-            <Typography sx={{ ml: 0.65, color: pf.text.primary, fontSize: 9, fontWeight: 850 }}>
-              {status.toUpperCase()}
-            </Typography>
-            <Chip
-              label={rows.length}
-              size="small"
-              sx={{ ml: 'auto', height: 17, color, bgcolor: `${color}12`, fontSize: 7 }}
-            />
-          </Stack>
-          <Stack gap={0.7}>
-            {rows.map((decision) => (
+}) => {
+  const [selectedId, setSelectedId] = useState(decisions[0]?.decision_id ?? '');
+  const selected = decisions.find((item) => item.decision_id === selectedId) ?? decisions[0];
+  const selectedStatusIndex = selected ? decisionStatuses.indexOf(selected.status) : -1;
+
+  return (
+    <Stack gap={1.1}>
+      <Paper sx={{ ...panelSx, p: 1 }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: 'repeat(2,1fr)', md: 'repeat(6,1fr)' },
+            gap: 0.6,
+          }}
+        >
+          {decisionStatuses.map((status, index) => {
+            const count = decisions.filter((item) => item.status === status).length;
+            const active = index <= selectedStatusIndex;
+            return (
               <Box
-                key={decision.decision_id}
+                key={status}
                 sx={{
-                  p: 0.9,
-                  bgcolor: pf.background.secondary,
-                  border: `1px solid ${pf.structure.borderSoft}`,
-                  borderRadius: '10px',
+                  p: 0.85,
+                  borderRadius: '8px',
+                  bgcolor: active ? `${pf.functional.cyan}10` : '#061721',
+                  border: `1px solid ${active ? `${pf.functional.cyan}45` : '#174453'}`,
                 }}
               >
-                <Typography sx={{ color: pf.text.primary, fontSize: 10, fontWeight: 800 }}>
-                  {decision.title}
+                <Typography sx={{ color: active ? pf.functional.cyan : '#648895', fontSize: 7.5 }}>
+                  {String(index + 1).padStart(2, '0')} · {status.toUpperCase()}
                 </Typography>
-                <Typography sx={{ color: pf.text.tertiary, fontSize: 7.5, mt: 0.35 }}>
-                  {decision.decision_id} · {decision.assignee}
+                <Typography
+                  sx={{ color: pf.text.primary, fontSize: 13, fontWeight: 850, mt: 0.25 }}
+                >
+                  {count}
                 </Typography>
-                <Typography sx={{ color: pf.text.secondary, fontSize: 8, mt: 0.55 }}>
-                  Avant {formatDateTime(decision.due_at)}
-                </Typography>
-                {statusIndex < decisionStatuses.length - 1 && (
-                  <Button
-                    disabled={busyId === decision.decision_id}
-                    onClick={() => onAdvance(decision)}
-                    endIcon={
-                      busyId === decision.decision_id ? (
-                        <CircularProgress size={10} />
-                      ) : (
-                        <IconifyIcon icon="lucide:arrow-right" />
-                      )
-                    }
-                    sx={{
-                      width: 1,
-                      mt: 0.8,
-                      minHeight: 25,
-                      color,
-                      bgcolor: `${color}10`,
-                      borderRadius: '7px',
-                      fontSize: 7.5,
-                    }}
-                  >
-                    {decisionStatuses[statusIndex + 1]}
-                  </Button>
-                )}
               </Box>
-            ))}
+            );
+          })}
+        </Box>
+      </Paper>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: 'minmax(270px,.7fr) minmax(0,1.3fr)' },
+          gap: 1.1,
+          alignItems: 'start',
+        }}
+      >
+        <Paper sx={{ ...panelSx, p: 1 }}>
+          <SectionTitle
+            icon="lucide:list-filter"
+            title="File active"
+            caption="Échéance, statut et responsable"
+          />
+          <Stack gap={0.45}>
+            {decisions.map((decision) => {
+              const active = selected?.decision_id === decision.decision_id;
+              return (
+                <ButtonBase
+                  key={decision.decision_id}
+                  onClick={() => setSelectedId(decision.decision_id)}
+                  sx={{
+                    width: '100%',
+                    p: 1,
+                    display: 'block',
+                    textAlign: 'left',
+                    borderRadius: '8px',
+                    border: `1px solid ${active ? `${pf.functional.cyan}70` : 'transparent'}`,
+                    bgcolor: active ? `${pf.functional.cyan}0c` : 'transparent',
+                    '&:hover': { bgcolor: '#0B2733' },
+                  }}
+                >
+                  <Stack direction="row" alignItems="center">
+                    <Typography sx={{ color: '#648895', fontSize: 7.5 }}>
+                      {decision.decision_id}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={decision.status}
+                      sx={{ ml: 'auto', height: 18, color: pf.functional.cyan, fontSize: 6.5 }}
+                    />
+                  </Stack>
+                  <Typography
+                    sx={{ color: pf.text.primary, fontSize: 9.5, fontWeight: 800, mt: 0.4 }}
+                  >
+                    {decision.title}
+                  </Typography>
+                  <Typography sx={{ color: '#7899A5', fontSize: 7.5, mt: 0.3 }}>
+                    {decision.assignee} · avant {formatDateTime(decision.due_at)}
+                  </Typography>
+                </ButtonBase>
+              );
+            })}
           </Stack>
         </Paper>
-      );
-    })}
-  </Box>
-);
+        {selected && (
+          <Paper sx={panelSx}>
+            <Stack direction="row" alignItems="flex-start">
+              <Box>
+                <Typography sx={{ color: pf.functional.cyan, fontSize: 8, fontWeight: 900 }}>
+                  {selected.decision_id} · {selected.status.toUpperCase()}
+                </Typography>
+                <Typography
+                  sx={{ color: pf.text.primary, fontSize: 17, fontWeight: 850, mt: 0.35 }}
+                >
+                  {selected.title}
+                </Typography>
+              </Box>
+              <Typography
+                sx={{ ml: 'auto', color: pf.functional.amber, fontSize: 9, fontWeight: 800 }}
+              >
+                Avant {formatDateTime(selected.due_at)}
+              </Typography>
+            </Stack>
+            <Typography sx={{ color: '#83A2AE', fontSize: 9.5, mt: 1 }}>
+              {selected.description}
+            </Typography>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(3,1fr)' },
+                gap: 0.8,
+                my: 1.2,
+              }}
+            >
+              {[
+                ['Responsable', selected.assignee],
+                ['Alerte source', selected.alert_id ?? 'Décision manuelle'],
+                ['Unités concernées', selected.unit_ids.length.toString()],
+              ].map(([label, value]) => (
+                <Box key={label} sx={{ p: 1, bgcolor: '#061721', borderRadius: '8px' }}>
+                  <Typography sx={{ color: '#648895', fontSize: 7 }}>
+                    {label.toUpperCase()}
+                  </Typography>
+                  <Typography
+                    sx={{ color: pf.text.primary, fontSize: 9.5, fontWeight: 800, mt: 0.3 }}
+                  >
+                    {value}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+            <Box sx={{ p: 1.1, bgcolor: `${pf.functional.green}0a`, borderRadius: '9px' }}>
+              <Typography sx={{ color: pf.functional.green, fontSize: 7.5, fontWeight: 900 }}>
+                EFFET ATTENDU
+              </Typography>
+              <Typography sx={{ color: '#9DB4BC', fontSize: 9, mt: 0.3 }}>
+                {selected.expected_effect}
+              </Typography>
+            </Box>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              alignItems={{ sm: 'center' }}
+              mt={1.3}
+              gap={0.8}
+            >
+              <Typography sx={{ color: '#7899A5', fontSize: 8 }}>
+                Dernière mise à jour {formatDateTime(selected.updated_at)}
+              </Typography>
+              {selectedStatusIndex < decisionStatuses.length - 1 && (
+                <Button
+                  disabled={busyId === selected.decision_id}
+                  onClick={() => onAdvance(selected)}
+                  endIcon={
+                    busyId === selected.decision_id ? (
+                      <CircularProgress size={10} />
+                    ) : (
+                      <IconifyIcon icon="lucide:arrow-right" />
+                    )
+                  }
+                  sx={{ ml: { sm: 'auto' }, color: '#06141D', bgcolor: pf.functional.cyan }}
+                >
+                  Passer à « {decisionStatuses[selectedStatusIndex + 1]} »
+                </Button>
+              )}
+            </Stack>
+          </Paper>
+        )}
+      </Box>
+    </Stack>
+  );
+};
 
 const SimulationView = ({ stages }: { stages: TowerStage[] }) => {
   const [payload, setPayload] = useState<SimulationPayload>({
@@ -1673,8 +1991,6 @@ const ControlTowerPage = ({ view }: { view: ControlTowerView }) => {
           snapshot={snapshot}
           selectedStage={selectedStage}
           setSelectedStage={setSelectedStage}
-          selectedUnit={selectedUnit}
-          setSelectedUnit={setSelectedUnit}
           onOpenDecision={createDecision}
         />
       )}
@@ -1802,7 +2118,14 @@ const ControlTowerPage = ({ view }: { view: ControlTowerView }) => {
                 title={`${filteredUnits.length} unités à examiner`}
                 caption="Impact × urgence × risque de durée × confiance"
               />
-              <Stack gap={0.8}>
+              <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+                <UnitQueueTable
+                  units={filteredUnits}
+                  selectedId={selectedUnit}
+                  onSelect={setSelectedUnit}
+                />
+              </Box>
+              <Stack gap={0.8} sx={{ display: { xs: 'flex', md: 'none' } }}>
                 {filteredUnits.map((unit, index) => (
                   <UnitQueueCard
                     key={unit.unit_id}
@@ -1983,6 +2306,61 @@ const ControlTowerPage = ({ view }: { view: ControlTowerView }) => {
               );
             })}
           </Box>
+          <Paper sx={panelSx}>
+            <SectionTitle
+              icon="lucide:brain-circuit"
+              title="Serving des modèles de temps restant"
+              caption="Checkpoint, contrat de variables, intégrité et autorisation live"
+              action={
+                <Chip
+                  size="small"
+                  label={snapshot.model_serving?.ready ? 'BUNDLE VALIDE' : 'NON RACCORDÉ'}
+                  sx={{
+                    color: snapshot.model_serving?.ready
+                      ? pf.functional.green
+                      : pf.functional.amber,
+                    fontSize: 7,
+                  }}
+                />
+              }
+            />
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)', lg: 'repeat(4,1fr)' },
+                gap: 0.8,
+              }}
+            >
+              {[
+                ['État', snapshot.model_serving?.state ?? 'NOT_CONFIGURED'],
+                [
+                  'Artefacts validés',
+                  `${snapshot.model_serving?.validated_artifacts ?? 0} / ${snapshot.model_serving?.required_unit_roles ?? 10}`,
+                ],
+                ['Bundle', snapshot.model_serving?.bundle_id ?? '—'],
+                [
+                  'Autorisation',
+                  snapshot.model_serving?.live_eligible ? 'LIVE AUTORISÉ' : 'REJEU HISTORIQUE',
+                ],
+              ].map(([label, value]) => (
+                <Box key={label} sx={{ p: 1, bgcolor: '#061721', borderRadius: '9px' }}>
+                  <Typography sx={{ color: '#648895', fontSize: 7.5 }}>
+                    {label.toUpperCase()}
+                  </Typography>
+                  <Typography
+                    sx={{ color: pf.text.primary, fontSize: 9.5, fontWeight: 800, mt: 0.35 }}
+                  >
+                    {value}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+            {!!snapshot.model_serving?.issues.length && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                {snapshot.model_serving.issues.join(' · ')}
+              </Alert>
+            )}
+          </Paper>
           <Paper sx={panelSx}>
             <SectionTitle
               icon="lucide:warehouse"

@@ -180,6 +180,19 @@ export interface ControlTowerSnapshot {
   sources: TowerSource[];
   audit: TowerAuditEvent[];
   recommendations: TowerRecommendation[];
+  model_serving?: {
+    configured: boolean;
+    ready: boolean;
+    live_enabled: boolean;
+    live_eligible: boolean;
+    state: string;
+    bundle_id: string | null;
+    promotion_status: string | null;
+    source_max_time: string | null;
+    validated_artifacts: number;
+    required_unit_roles: number;
+    issues: string[];
+  };
   permissions: string[];
 }
 

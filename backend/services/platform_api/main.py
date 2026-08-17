@@ -1171,3 +1171,7 @@ app.include_router(b62b_router)
 # PORTFLOW_CONTROL_TOWER_MVP_ROUTER
 from platform_api.control_tower_routes import router as control_tower_router
 app.include_router(control_tower_router)
+
+# GOVERNED_CHECKPOINT_MODEL_SERVING_ROUTER
+from platform_api.model_serving import router as model_serving_router
+app.include_router(model_serving_router)

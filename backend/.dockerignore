@@ -23,6 +23,8 @@ reports
 *.pt
 *.ckpt
 *.onnx
+*.cbm
 *.nc
 *.grib
 *.grib2
+model_bundle/runtime

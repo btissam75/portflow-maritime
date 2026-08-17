@@ -8,6 +8,8 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from platform_api.model_serving import public_model_status
+
 
 router = APIRouter(prefix="/api/v1/control-tower", tags=["PortFlow Control Tower"])
 
@@ -218,47 +220,50 @@ def _build_forecast(now: datetime, stages: list[dict[str, Any]]) -> list[dict[st
 def _build_alerts(now: datetime, units: list[dict[str, Any]], stages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     hot_stage = max(stages, key=lambda item: item["occupancy_pct"])
     critical = [unit for unit in units if unit["tier"] == "CRITIQUE"]
+    exposed = critical[:12] or [unit for unit in units if unit["tier"] == "VIGILANCE"][:12]
+    stalled = units[10:21]
+    vessel_exposed = units[21:35]
     return [
         {
             "alert_id": "ALT-260816-01",
             "severity": "CRITIQUE" if hot_stage["occupancy_pct"] >= 95 else "VIGILANCE",
             "title": f"Risque de saturation {hot_stage['label']}",
-            "message": f"La charge pourrait dépasser la capacité entre H+3 et H+6. {min(19, len(critical) + 8)} unités sont directement exposées.",
+            "message": f"La charge pourrait dépasser la capacité entre H+3 et H+6. {len(exposed)} unités sont directement exposées.",
             "probability": 0.82,
             "impact": "Allongement probable de l’ETA prudente et report vers les zones amont.",
             "cause": f"Occupation actuelle {hot_stage['occupancy_pct']:.0f}% et arrivées en hausse.",
             "recommendation": f"Renforcer temporairement la capacité {hot_stage['label']} avant H+2.",
             "deadline_at": now + timedelta(hours=2),
             "confidence": 0.86,
-            "unit_ids": [unit["unit_id"] for unit in critical[:12]],
+            "unit_ids": [unit["unit_id"] for unit in exposed],
             "status": "À traiter",
         },
         {
             "alert_id": "ALT-260816-02",
             "severity": "VIGILANCE",
             "title": "Unités sans progression récente",
-            "message": "Onze unités n’ont pas produit l’événement attendu dans leur fenêtre habituelle.",
+            "message": f"{len(stalled)} unités n’ont pas produit l’événement attendu dans leur fenêtre habituelle.",
             "probability": 0.74,
             "impact": "Risque d’accumulation invisible dans le Park et le Scan.",
             "cause": "Délai inter-événements supérieur au P90 historique.",
             "recommendation": "Lancer une vérification ciblée des unités concernées.",
             "deadline_at": now + timedelta(minutes=50),
             "confidence": 0.79,
-            "unit_ids": [unit["unit_id"] for unit in units[10:21]],
+            "unit_ids": [unit["unit_id"] for unit in stalled],
             "status": "En analyse",
         },
         {
             "alert_id": "ALT-260816-03",
             "severity": "INFORMATION",
             "title": "Fenêtre navire avancée",
-            "message": "Atlas Horizon pourrait se présenter 1 h 35 plus tôt que la fenêtre initiale.",
+            "message": f"Atlas Horizon pourrait se présenter 1 h 35 plus tôt que la fenêtre initiale. {len(vessel_exposed)} unités sont associées.",
             "probability": 0.68,
             "impact": "Quatorze unités associées disposent d’une marge terminale réduite.",
             "cause": "Vitesse d’approche supérieure au profil du voyage.",
             "recommendation": "Surveiller les unités associées et confirmer la fenêtre d’accostage.",
             "deadline_at": now + timedelta(hours=3),
             "confidence": 0.72,
-            "unit_ids": [unit["unit_id"] for unit in units[21:35]],
+            "unit_ids": [unit["unit_id"] for unit in vessel_exposed],
             "status": "Surveillance",
         },
     ]
@@ -331,6 +336,7 @@ def _snapshot() -> dict[str, Any]:
     stages = _build_stages(now)
     forecast = _build_forecast(now, stages)
     alerts = _build_alerts(now, units, stages)
+    model_status = public_model_status()
     _ensure_decisions(now)
     active_total = sum(stage["units"] for stage in stages)
     critical_count = sum(1 for unit in units if unit["tier"] == "CRITIQUE")
@@ -349,7 +355,13 @@ def _snapshot() -> dict[str, Any]:
     }
     sources = [
         {"source": "Événements métier", "status": "À JOUR", "age_minutes": 2, "completeness_pct": 99.3, "detail": "Dernier événement consolidé"},
-        {"source": "Prédictions ETA", "status": "SHADOW", "age_minutes": 8, "completeness_pct": 98.7, "detail": "Contrat prêt, moteur à raccorder"},
+        {
+            "source": "Prédictions ETA",
+            "status": "PRÊT" if model_status["ready"] else "NON RACCORDÉ",
+            "age_minutes": 8,
+            "completeness_pct": 100.0 if model_status["ready"] else 0.0,
+            "detail": model_status["state"],
+        },
         {"source": "Localisation unités", "status": "PARTIEL", "age_minutes": 14, "completeness_pct": 87.4, "detail": "GPS ou dernière zone métier"},
         {"source": "Positions navires", "status": "EXERCICE", "age_minutes": 4, "completeness_pct": 94.8, "detail": "Contrat AIS prêt"},
     ]
@@ -358,9 +370,13 @@ def _snapshot() -> dict[str, Any]:
         for index in range(12)
     ] + list(_audit_extra)
     return {
-        "contract_version": "control-tower-mvp-v1",
+        "contract_version": "control-tower-mvp-v2",
         "mode": "EXERCISE",
-        "serving_status": "CONTRACT_READY_MODEL_NOT_CONNECTED",
+        "serving_status": (
+            "MODEL_BUNDLE_READY_SYNTHETIC_SNAPSHOT"
+            if model_status["ready"]
+            else "CONTRACT_READY_MODEL_NOT_CONNECTED"
+        ),
         "generated_at": now,
         "refresh_after_seconds": 30,
         "metrics": metrics,
@@ -376,6 +392,7 @@ def _snapshot() -> dict[str, Any]:
             {"recommendation_id": "REC-001", "title": "Renforcer Scan pendant 4 h", "expected_gain_h": 2.8, "beneficiary_units": 47, "confidence": 0.84, "secondary_risk": "Déplacement temporaire de la file vers le SAS", "evidence": ["Charge H+3", "Dwell P90", "Unités GE24"]},
             {"recommendation_id": "REC-002", "title": "Prioriser 14 unités Atlas Horizon", "expected_gain_h": 1.9, "beneficiary_units": 14, "confidence": 0.77, "secondary_risk": "Retard marginal pour 6 unités non prioritaires", "evidence": ["ETA maritime", "Fenêtre terminale", "Marge unité-navire"]},
         ],
+        "model_serving": model_status,
         "permissions": ["VIEW", "DECIDE", "ASSIGN", "EXPORT", "SIMULATE"],
     }
 

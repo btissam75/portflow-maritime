@@ -1,0 +1,32 @@
+{
+  "schema_version": "PORTFLOW_MODEL_BUNDLE_V1",
+  "bundle_id": "b48r-production-candidate-YYYYMMDD",
+  "created_at": "2026-08-17T00:00:00Z",
+  "source_max_time": "2026-04-22T10:00:00Z",
+  "promotion_status": "VALIDATED",
+  "training_run": "E0_STRICT_PASS_B48R",
+  "git_commit": null,
+  "formulas": {
+    "B36B": "clip(0.9*B36B_MAE+0.1*B36B_RMSE,0,48)",
+    "B48R": "clip(0.9*B36B+0.1*B48_META,0,48)"
+  },
+  "artifacts": [
+    {
+      "role": "B36B_MAE",
+      "path": "models/B36B_FINAL_MAE.cbm",
+      "sha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "format": "catboost",
+      "task": "regression",
+      "prediction_kind": "scalar",
+      "output_transform": "identity",
+      "feature_names": ["REPLACE_WITH_EXACT_ORDERED_FEATURE_NAMES"],
+      "cat_feature_names": [],
+      "metadata": {}
+    }
+  ],
+  "scientific_limits": [
+    "Copy all ten required B36B/B36C/B44/B48 roles before activation",
+    "Use the exact feature order recovered during E0-B",
+    "A VALIDATED bundle remains historical-replay-only until formally PROMOTED"
+  ]
+}
