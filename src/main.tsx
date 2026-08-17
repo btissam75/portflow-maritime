@@ -1,6 +1,5 @@
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import BreakpointsProvider from 'providers/BreakpointsProvider';
-import { ReplayProvider } from 'providers/ReplayProvider';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
@@ -14,9 +13,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ThemeProvider theme={theme}>
       <BreakpointsProvider>
         <CssBaseline />
-        <ReplayProvider>
-          <RouterProvider router={router} />
-        </ReplayProvider>
+        <RouterProvider router={router} />
       </BreakpointsProvider>
     </ThemeProvider>
   </React.StrictMode>,

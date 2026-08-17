@@ -14,7 +14,8 @@ const WeatherPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [liveError, setLiveError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
+  const [outlookUpdatedAt, setOutlookUpdatedAt] = useState<string | null>(null);
+  const [liveUpdatedAt, setLiveUpdatedAt] = useState<string | null>(null);
 
   const loadOutlook = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -22,7 +23,13 @@ const WeatherPage = () => {
     try {
       const response = await metoceanApi.getDashboard(signal);
       setData(response);
-      setLastUpdatedAt(new Date().toISOString());
+      const hasOutlookData = Boolean(
+        response.status ||
+          response.forecast.length ||
+          response.impacts.length ||
+          response.validation,
+      );
+      setOutlookUpdatedAt(hasOutlookData ? new Date().toISOString() : null);
     } catch (reason) {
       if (reason instanceof DOMException && reason.name === 'AbortError') return;
       setError('Les prévisions à 72 h sont momentanément indisponibles.');
@@ -37,7 +44,7 @@ const WeatherPage = () => {
     try {
       const response = await liveMetoceanApi.getDashboard(signal);
       setLiveData(response);
-      setLastUpdatedAt(new Date().toISOString());
+      setLiveUpdatedAt(response.atmosphere || response.marine ? response.fetchedAt : null);
     } catch (reason) {
       if (reason instanceof DOMException && reason.name === 'AbortError') return;
       setLiveError('Les conditions actuelles sont momentanément indisponibles.');
@@ -72,8 +79,10 @@ const WeatherPage = () => {
         liveData={liveData}
         loading={loading}
         liveLoading={liveLoading}
-        error={error ?? liveError}
-        lastUpdatedAt={lastUpdatedAt}
+        outlookError={error}
+        liveError={liveError}
+        outlookUpdatedAt={outlookUpdatedAt}
+        liveUpdatedAt={liveUpdatedAt}
         autoRefresh={autoRefresh}
         onAutoRefreshChange={setAutoRefresh}
         onRefresh={() => void loadAll()}

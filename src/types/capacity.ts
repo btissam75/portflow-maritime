@@ -60,4 +60,5 @@ export interface CapacityDashboardData {
   status: CapacityRankingStatus | null;
   snapshot: CapacitySnapshot | null;
   unavailable: string[];
+  fetchedAt: string;
 }

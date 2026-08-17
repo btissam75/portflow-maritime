@@ -9,6 +9,8 @@ from fastapi import APIRouter, HTTPException, Query
 from psycopg2.pool import SimpleConnectionPool
 from pydantic import BaseModel
 
+from platform_api import local_demo
+
 
 POLICY_VERSION = "b61e-capacity-aware-temporal-ranking-v1"
 AUDIT_SOURCE = "b61e_capacity_aware_temporal_ranking"
@@ -135,6 +137,25 @@ router = APIRouter(
 
 @router.get("/status", response_model=RankingStatus)
 def status() -> RankingStatus:
+    if local_demo.enabled():
+        resolved = local_demo.capacity_snapshot_times()[-1]
+        return RankingStatus(
+            audit_status="DEMO",
+            decision="LOCAL_DEMO_SHADOW_REPLAY",
+            policy_version=local_demo.DEMO_POLICY_VERSION,
+            selected_candidate_id="DEMO_CAPACITY_RANKER",
+            selected_score="TEMPORAL_RISK_DEMO",
+            selected_top_k=6,
+            bucket_hours=6,
+            contracts_passed=True,
+            integrity_passed=True,
+            shadow_api_allowed=True,
+            production_promotion_allowed=False,
+            automatic_action_allowed=False,
+            serving_rows=len(local_demo.VESSELS) * len(local_demo.capacity_snapshot_times()),
+            next_block="CONNECT_REAL_B61E_MATERIALIZATION",
+            finished_at=resolved,
+        )
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -168,6 +189,11 @@ def status() -> RankingStatus:
 
 def _resolved_at(requested: datetime | None, role: str) -> datetime:
     requested = _normalize_time(requested)
+    if local_demo.enabled():
+        resolved = local_demo.resolve_capacity_time(requested)
+        if resolved is None:
+            raise HTTPException(status_code=404, detail="No demo ranking snapshot found")
+        return resolved
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             f"""
@@ -228,6 +254,21 @@ def snapshot(
 ) -> WatchlistSnapshot:
     evaluation_role = _validate_role(evaluation_role)
     resolved = _resolved_at(at, evaluation_role)
+    if local_demo.enabled():
+        all_decisions = [
+            WatchlistDecision(**row)
+            for row in local_demo.capacity_decisions(resolved, evaluation_role)
+        ]
+        decisions = [row for row in all_decisions if row.watchlist_selected] if selected_only else all_decisions
+        return WatchlistSnapshot(
+            requested_at=_normalize_time(at),
+            resolved_at=resolved,
+            evaluation_role=evaluation_role,
+            active_calls=len(all_decisions),
+            capacity=6,
+            selected_calls=sum(row.watchlist_selected for row in all_decisions),
+            decisions=decisions[:limit],
+        )
     selection_filter = " AND watchlist_selected=true" if selected_only else ""
     decisions = _decisions(
         f"evaluation_role=%s AND decision_at=%s{selection_filter}",
@@ -258,6 +299,12 @@ def watchlist(
 ) -> list[WatchlistDecision]:
     evaluation_role = _validate_role(evaluation_role)
     resolved = _resolved_at(at, evaluation_role)
+    if local_demo.enabled():
+        return [
+            WatchlistDecision(**row)
+            for row in local_demo.capacity_decisions(resolved, evaluation_role)
+            if row["watchlist_selected"]
+        ]
     return _decisions(
         "evaluation_role=%s AND decision_at=%s AND watchlist_selected=true",
         (evaluation_role, resolved),
@@ -270,6 +317,11 @@ def timeline(
     port_call_id: str,
     limit: int = Query(default=250, ge=1, le=1_000),
 ) -> list[WatchlistDecision]:
+    if local_demo.enabled():
+        rows = local_demo.capacity_timeline(port_call_id)[-limit:]
+        if not rows:
+            raise HTTPException(status_code=404, detail="Demo port-call timeline not found")
+        return [WatchlistDecision(**row) for row in rows]
     rows = _decisions("port_call_id=%s", (port_call_id,), limit)
     if not rows:
         raise HTTPException(status_code=404, detail="B61E port-call timeline not found")
@@ -278,6 +330,16 @@ def timeline(
 
 @router.get("/scorecard")
 def scorecard() -> list[dict[str, Any]]:
+    if local_demo.enabled():
+        return [
+            {
+                "candidate_id": "DEMO_CAPACITY_RANKER",
+                "stage": "LOCAL_DEMO",
+                "role": "VALID_SELECT",
+                "selected": True,
+                "metrics": {"scientific_claim_allowed": False},
+            }
+        ]
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             f"""
@@ -299,6 +361,22 @@ def scorecard() -> list[dict[str, Any]]:
 
 @router.get("/model-card")
 def model_card() -> dict[str, Any]:
+    if local_demo.enabled():
+        return {
+            "policy_version": local_demo.DEMO_POLICY_VERSION,
+            "source_model_version": "LOCAL_DEMO_ONLY",
+            "source_hsmm_version": "LOCAL_DEMO_ONLY",
+            "selected_candidate_id": "DEMO_CAPACITY_RANKER",
+            "selected_policy": {"top_k": 6, "bucket_hours": 6},
+            "bootstrap_intervals": {},
+            "model_card": {"mode": "LOCAL_DEMO", "scientific_claim_allowed": False},
+            "quality_gates": [],
+            "shadow_api_allowed": True,
+            "production_claim_allowed": False,
+            "automatic_action_allowed": False,
+            "fresh_forward_confirmation_required": True,
+            "created_at": local_demo.capacity_snapshot_times()[-1],
+        }
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             f"""

@@ -11,6 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from psycopg2.pool import SimpleConnectionPool
 from pydantic import BaseModel, Field
 
+from platform_api import local_demo
+
 
 SERVICE_VERSION = "b56h-b56gv21-platform-api-v1"
 FORECAST_VERSION = "b56g-v2.1-asymmetric-aci-v1"
@@ -391,11 +393,22 @@ def health() -> dict[str, str]:
         "status": "healthy",
         "service": "maritime-historical-replay-api",
         "version": SERVICE_VERSION,
+        "mode": "local-demo-shadow" if local_demo.enabled() else "database",
     }
 
 
 @app.get("/ready")
 def ready() -> dict[str, Any]:
+    if local_demo.enabled():
+        return {
+            "status": "ready",
+            "service": "maritime-historical-replay-api",
+            "mode": "local-demo-shadow",
+            "serving_rows": 0,
+            "last_as_of_time": local_demo.capacity_snapshot_times()[-1],
+            "live": False,
+            "scientific_claim_allowed": False,
+        }
     replay_range = get_replay_range()
     return {
         "status": "ready",
@@ -1154,3 +1167,7 @@ app.include_router(b62a_router)
 # B62B_VINTAGE_FORECAST_SHADOW_VALIDATION_ROUTER
 from platform_api.b62b_routes import router as b62b_router
 app.include_router(b62b_router)
+
+# PORTFLOW_CONTROL_TOWER_MVP_ROUTER
+from platform_api.control_tower_routes import router as control_tower_router
+app.include_router(control_tower_router)

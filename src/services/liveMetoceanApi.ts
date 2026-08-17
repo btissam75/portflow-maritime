@@ -1,4 +1,5 @@
 import type { LiveMarineResponse, LiveMetoceanData, LiveWeatherResponse } from 'types/liveMetocean';
+import { getJson } from 'services/http';
 
 const TANGER_MED = { latitude: 35.891, longitude: -5.501 };
 
@@ -44,15 +45,6 @@ const MARINE_VARIABLES = [
   'sea_level_height_msl',
 ];
 
-async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(body || `Open-Meteo request failed with status ${response.status}`);
-  }
-  return response.json() as Promise<T>;
-}
-
 const weatherUrl = () => {
   const params = new URLSearchParams({
     latitude: String(TANGER_MED.latitude),
@@ -85,8 +77,14 @@ const marineUrl = () => {
 export const liveMetoceanApi = {
   async getDashboard(signal?: AbortSignal): Promise<LiveMetoceanData> {
     const [atmosphereResult, marineResult] = await Promise.allSettled([
-      getJson<LiveWeatherResponse>(weatherUrl(), signal),
-      getJson<LiveMarineResponse>(marineUrl(), signal),
+      getJson<LiveWeatherResponse>(weatherUrl(), {
+        signal,
+        sourceLabel: 'Les observations atmosphériques',
+      }),
+      getJson<LiveMarineResponse>(marineUrl(), {
+        signal,
+        sourceLabel: 'Les observations marines',
+      }),
     ] as const);
 
     const unavailable: string[] = [];

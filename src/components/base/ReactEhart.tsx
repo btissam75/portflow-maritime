@@ -7,6 +7,7 @@ import { forwardRef } from 'react';
 export interface ReactEchartProps extends BoxProps {
   echarts: EChartsReactProps['echarts'];
   option: EChartsReactProps['option'];
+  onEvents?: EChartsReactProps['onEvents'];
 }
 
 const ReactEchart = forwardRef<null | EChartsReactCore, ReactEchartProps>(

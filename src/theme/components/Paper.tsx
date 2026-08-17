@@ -8,13 +8,13 @@ const Paper: Components<Omit<Theme, 'components'>>['MuiPaper'] = {
   styleOverrides: {
     root: ({ theme }) => ({
       backgroundImage: 'none',
-      backgroundColor: '#0D2230',
-      border: '1px solid #1D3C4B',
+      backgroundColor: '#15191E',
+      border: '1px solid #303840',
       borderRadius: theme.shape.borderRadius,
     }),
     elevation1: ({ theme }) => ({
       borderRadius: theme.shape.borderRadius,
-      boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+      boxShadow: '0 16px 42px rgba(0,0,0,.24)',
     }),
   },
 };

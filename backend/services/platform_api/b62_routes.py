@@ -9,6 +9,8 @@ from fastapi import APIRouter, HTTPException, Query
 from psycopg2.pool import SimpleConnectionPool
 from pydantic import BaseModel
 
+from platform_api import local_demo
+
 
 MODEL_VERSION = "b62-weather-wave-vessel-autogluon-v1"
 AUDIT_SOURCE = "b62_weather_wave_vessel_autogluon"
@@ -116,6 +118,26 @@ router = APIRouter(
 
 @router.get("/status", response_model=B62Status)
 def status() -> B62Status:
+    if local_demo.enabled():
+        forecasts = local_demo.metocean_forecast("ISSUE_TIME_PROVIDER_OPERATIONAL_INPUT")
+        impacts = local_demo.vessel_impacts()
+        return B62Status(
+            audit_status="DEMO",
+            decision="LOCAL_DEMO_SHADOW_ONLY",
+            model_version=local_demo.DEMO_METOCEAN_VERSION,
+            rows=len(forecasts),
+            selected_chronos_tasks=0,
+            issue_time_ready=True,
+            issue_time_span_days=3.0,
+            critical_gates_passed=True,
+            test_used_for_selection=False,
+            production_promotion_allowed=False,
+            automatic_action_allowed=False,
+            serving_forecast_rows=len(forecasts),
+            serving_impact_rows=len(impacts),
+            next_block="CONNECT_REAL_B62_MATERIALIZATION",
+            finished_at=forecasts[0]["issue_at"],
+        )
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -155,6 +177,11 @@ def forecast(
 ) -> list[ForecastPoint]:
     if track not in TRACKS:
         raise HTTPException(status_code=422, detail="Unsupported B62 forecast track")
+    if local_demo.enabled():
+        rows = local_demo.metocean_forecast(track)
+        if variable is not None:
+            rows = [row for row in rows if row["variable"] == variable]
+        return [ForecastPoint(**row) for row in rows[:limit]]
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             f"""
@@ -184,6 +211,13 @@ def vessel_impact(
     priority_tier: str | None = Query(default=None),
     limit: int = Query(default=250, ge=1, le=1_000),
 ) -> list[VesselImpact]:
+    if local_demo.enabled():
+        rows = local_demo.vessel_impacts()
+        if horizon_h is not None:
+            rows = [row for row in rows if row["horizon_h"] == horizon_h]
+        if priority_tier is not None:
+            rows = [row for row in rows if row["priority_tier"] == priority_tier]
+        return [VesselImpact(**row) for row in rows[:limit]]
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             f"""
@@ -207,6 +241,17 @@ def vessel_impact(
 
 @router.get("/model-card")
 def model_card() -> dict[str, Any]:
+    if local_demo.enabled():
+        return {
+            "model_version": local_demo.DEMO_METOCEAN_VERSION,
+            "decision": "LOCAL_DEMO_SHADOW_ONLY",
+            "runtime": "LOCAL_DEMO",
+            "issue_time_ready": True,
+            "production_promotion_allowed": False,
+            "automatic_action_allowed": False,
+            "test_role": "NOT_CONSUMED",
+            "artifacts": {},
+        }
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             """

@@ -8,27 +8,33 @@ const MainLayout = ({ children }: PropsWithChildren) => {
   const location = useLocation();
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#06121C', background: 'radial-gradient(circle at 55% -10%, rgba(30,92,116,0.24) 0%, rgba(8,25,37,0.92) 35%, #06121C 72%)' }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: '#06141D',
+        background:
+          'radial-gradient(circle at 8% -10%, rgba(53,214,207,.08), transparent 30%), radial-gradient(circle at 92% 4%, rgba(61,137,177,.08), transparent 28%), linear-gradient(145deg, #06141D, #08202B 52%, #06131B)',
+      }}
+    >
       <NavigationRail />
       <Topbar />
       <Box
         component="main"
-        sx={(theme) => ({
+        sx={{
           flexGrow: 1,
-          p: {
-            xs: theme.spacing(2, 1.25, 10),
-            sm: theme.spacing(2.5, 2, 10),
-            md: theme.spacing(2.5, 2.5, 4),
-            xl: theme.spacing(3, 3, 5),
-          },
-          ml: { xs: 0, md: '64px', xl: '208px' },
-          pt: { xs: '78px', md: '82px' },
+          px: { xs: 1.25, sm: 2, md: 2.5, xl: 3 },
+          pb: { xs: 10, md: 4, xl: 5 },
+          ml: { xs: 0, md: '78px' },
+          pt: { xs: '88px', md: '96px' },
           minHeight: '100vh',
-          width: { xs: 1, md: 'calc(100% - 64px)', xl: 'calc(100% - 208px)' },
+          width: { xs: 1, md: 'calc(100% - 78px)' },
           bgcolor: 'transparent',
-        })}
+        }}
       >
-        <Box key={location.pathname} sx={{ animation: 'portflowRouteIn 280ms cubic-bezier(.2,.8,.2,1) both' }}>
+        <Box
+          key={location.pathname}
+          sx={{ animation: 'portflowRouteIn 280ms cubic-bezier(.2,.8,.2,1) both' }}
+        >
           {children}
         </Box>
       </Box>

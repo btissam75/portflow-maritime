@@ -9,6 +9,8 @@ from fastapi import APIRouter, HTTPException
 from psycopg2.pool import SimpleConnectionPool
 from pydantic import BaseModel
 
+from platform_api import local_demo
+
 
 MODEL_VERSION = "b62a-governed-metocean-tail-challenger-v1"
 AUDIT_SOURCE = "b62a_governed_metocean_augmentation"
@@ -98,6 +100,30 @@ router = APIRouter(
 
 @router.get("/status", response_model=B62AStatus)
 def status() -> B62AStatus:
+    if local_demo.enabled():
+        selections = local_demo.metocean_selections()
+        return B62AStatus(
+            audit_status="DEMO",
+            decision="LOCAL_DEMO_CHALLENGER_REVIEW",
+            model_version=local_demo.DEMO_METOCEAN_VERSION,
+            synthetic_rows=0,
+            synthetic_weight=0.0,
+            accepted_challenger_tasks=sum(row["challenger_accepted"] for row in selections),
+            challenger_tasks=len(selections),
+            weekly_real_origins=0,
+            frozen_test_origins=0,
+            stress_scenarios=0,
+            critical_gates_passed=True,
+            valid_modified=False,
+            test_modified=False,
+            test_used_for_selection=False,
+            production_promotion_allowed=False,
+            automatic_action_allowed=False,
+            next_block="CONNECT_REAL_B62A_ARTIFACTS",
+            finished_at=local_demo.metocean_forecast(
+                "ISSUE_TIME_PROVIDER_OPERATIONAL_INPUT"
+            )[0]["issue_at"],
+        )
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -134,6 +160,8 @@ def status() -> B62AStatus:
 
 @router.get("/selection", response_model=list[TaskSelection])
 def selection() -> list[TaskSelection]:
+    if local_demo.enabled():
+        return [TaskSelection(**row) for row in local_demo.metocean_selections()]
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             f"""
@@ -153,6 +181,19 @@ def selection() -> list[TaskSelection]:
 
 @router.get("/model-card")
 def model_card() -> dict[str, Any]:
+    if local_demo.enabled():
+        return {
+            "model_version": local_demo.DEMO_METOCEAN_VERSION,
+            "source_b62_model_version": local_demo.DEMO_METOCEAN_VERSION,
+            "decision": "LOCAL_DEMO_CHALLENGER_REVIEW",
+            "synthetic_scope": "NONE_LOCAL_DEMO",
+            "test_role": "NOT_CONSUMED",
+            "weekly_replay_role": "LOCAL_DEMO",
+            "stress_role": "LOCAL_DEMO",
+            "production_promotion_allowed": False,
+            "automatic_action_allowed": False,
+            "artifacts": {},
+        }
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             """

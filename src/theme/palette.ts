@@ -31,19 +31,19 @@ const palette: PaletteOptions = {
   mode: 'dark',
   grey,
   text: {
-    primary: '#EDF7F9',
-    secondary: '#89A7B4',
-    disabled: '#45616D',
+    primary: '#F4F1EA',
+    secondary: '#AAB1B6',
+    disabled: '#50575E',
   },
 
   background: {
-    default: '#06121C',
-    paper: '#0D2230',
+    default: '#0B0D10',
+    paper: '#15191E',
   },
 
   action: {
-    hover: 'rgba(54,214,207,0.07)',
-    selected: 'rgba(54,214,207,0.13)',
+    hover: 'rgba(85,214,194,0.07)',
+    selected: 'rgba(85,214,194,0.13)',
   },
 
   neutral: {
@@ -56,19 +56,19 @@ const palette: PaletteOptions = {
   },
 
   primary: {
-    lighter: 'rgba(54,214,207,0.13)',
-    light: '#6FE4DF',
-    main: '#36D6CF',
-    dark: '#1CA9A5',
-    darker: '#0D5F61',
+    lighter: 'rgba(85,214,194,0.13)',
+    light: '#7BE5D4',
+    main: '#55D6C2',
+    dark: '#36AD9E',
+    darker: '#246E67',
   },
 
   secondary: {
-    lighter: 'rgba(73,167,255,0.14)',
-    light: '#7AC0FF',
-    main: '#49A7FF',
-    dark: '#287CC7',
-    darker: '#16466F',
+    lighter: 'rgba(165,139,250,0.14)',
+    light: '#B9A7FF',
+    main: '#A58BFA',
+    dark: '#8068D1',
+    darker: '#4D3C8B',
   },
 
   error: {

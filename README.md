@@ -6,7 +6,6 @@ now a monorepo: the React control tower lives at the root and the data/ML/API pl
 
 ## Functional pages
 
-- `/control-tower`: operational replay, probabilistic arrival forecasts and model diagnostics
 - `/weather`: live metocean situation, weather and wave forecasts, map and vessel-impact analysis
 - `/capacity`: capacity watchlist, temporal risk ranking and decision support
 
@@ -56,6 +55,30 @@ Platform URLs:
 Read [`PLATFORM_ENGINEERING_GUIDE.md`](./PLATFORM_ENGINEERING_GUIDE.md) before running scientific
 pipelines or changing data/model contracts.
 
+## Local UI demonstration without Docker
+
+The Git repository intentionally excludes port data, trained models and persistent TimescaleDB/
+MinIO volumes. The local demo mode exercises the Weather and Capacity API contracts without
+claiming that generated values are real or production-ready. It is disabled by default.
+
+Terminal 1 — local FastAPI shadow data:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ".\backend\scripts\start-local-demo.ps1"
+```
+
+Terminal 2 — React application:
+
+```powershell
+$env:VITE_API_BASE_URL = "http://localhost:8092"
+pnpm dev
+```
+
+Open `http://localhost:3000/weather` or `http://localhost:3000/capacity`. Every simulated result is
+visibly labelled `DEMO`; production promotion and automatic actions remain forbidden. To use real
+outputs, leave `SMART_PORT_LOCAL_DEMO_MODE` disabled and materialize the governed B61E/B62 tables
+through the platform flows described in the engineering guide.
+
 ## Local development
 
 ```powershell
@@ -82,7 +105,6 @@ powershell -ExecutionPolicy Bypass -File ".\deploy-live-metocean-ui.ps1"
 
 Published routes:
 
-- `http://localhost:8088/control-tower`
 - `http://localhost:8088/weather`
 - `http://localhost:8088/capacity`
 

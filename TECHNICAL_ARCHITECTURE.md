@@ -14,12 +14,12 @@ utiliser `PLATFORM_ENGINEERING_GUIDE.md` comme guide canonique.
 
 Etat de confiance utilise dans ce document :
 
-| Etiquette | Signification |
-|---|---|
-| `IMPLEMENTE-ICI` | Le code est present et verifiable dans ce depot. |
+| Etiquette         | Signification                                                            |
+| ----------------- | ------------------------------------------------------------------------ |
+| `IMPLEMENTE-ICI`  | Le code est present et verifiable dans ce depot.                         |
 | `EXTERNE-OBSERVE` | Le composant ou son etat d'execution depend de volumes/donnees hors Git. |
-| `CONTRAT` | Le frontend depend explicitement de ce schema ou endpoint. |
-| `CIBLE` | Architecture recommandee, pas encore implementee. |
+| `CONTRAT`         | Le frontend depend explicitement de ce schema ou endpoint.               |
+| `CIBLE`           | Architecture recommandee, pas encore implementee.                        |
 
 ## 1. Vue systeme
 
@@ -84,17 +84,17 @@ gouvernance appartiennent au backend.
 
 Les noms suivants ont ete observes sur la station de developpement :
 
-| Service | Port / acces | Responsabilite | Statut depot |
-|---|---:|---|---|
-| `spm-timescaledb` | interne Docker | Donnees temporelles, features et tables serving | `IMPLEMENTE-ICI` |
-| `spm-minio` | `9000/9001` | Objets Bronze/Gold, rapports et modeles | `IMPLEMENTE-ICI` |
-| `spm-storage-init` | job | Creation des buckets et initialisation | `IMPLEMENTE-ICI` |
-| `spm-prefect-db` | interne | Metadonnees d'orchestration Prefect | `IMPLEMENTE-ICI` |
-| `spm-prefect-redis` | interne | Coordination/queue Prefect | `IMPLEMENTE-ICI` |
-| `spm-prefect-server` | `4200` | API et interface d'orchestration | `IMPLEMENTE-ICI` |
-| `spm-prefect-worker` | interne | Execution Python des flows et taches | `IMPLEMENTE-ICI` |
-| `spm-platform-api` | `8092` | FastAPI et contrats JSON metier | `IMPLEMENTE-ICI` |
-| `spm-maritime-web` | `8088` | Nginx et bundle React | `IMPLEMENTE-ICI` |
+| Service              |   Port / acces | Responsabilite                                  | Statut depot     |
+| -------------------- | -------------: | ----------------------------------------------- | ---------------- |
+| `spm-timescaledb`    | interne Docker | Donnees temporelles, features et tables serving | `IMPLEMENTE-ICI` |
+| `spm-minio`          |    `9000/9001` | Objets Bronze/Gold, rapports et modeles         | `IMPLEMENTE-ICI` |
+| `spm-storage-init`   |            job | Creation des buckets et initialisation          | `IMPLEMENTE-ICI` |
+| `spm-prefect-db`     |        interne | Metadonnees d'orchestration Prefect             | `IMPLEMENTE-ICI` |
+| `spm-prefect-redis`  |        interne | Coordination/queue Prefect                      | `IMPLEMENTE-ICI` |
+| `spm-prefect-server` |         `4200` | API et interface d'orchestration                | `IMPLEMENTE-ICI` |
+| `spm-prefect-worker` |        interne | Execution Python des flows et taches            | `IMPLEMENTE-ICI` |
+| `spm-platform-api`   |         `8092` | FastAPI et contrats JSON metier                 | `IMPLEMENTE-ICI` |
+| `spm-maritime-web`   |         `8088` | Nginx et bundle React                           | `IMPLEMENTE-ICI` |
 
 Ne pas confondre les deux bases PostgreSQL :
 
@@ -119,26 +119,26 @@ MinIO/TimescaleDB, puis ne conserve dans Prefect que le statut d'execution et de
 
 ### 3.2 Familles de flows observees
 
-| Famille | Fonction | Sortie principale |
-|---|---|---|
-| `B58C-D` | Collecte horaire meteo/marine issue-time | Snapshots immuables + lignes forecast |
-| `B59A` | Audit des appels portuaires dynamiques | Rapport de disponibilite/qualite |
-| `B60A` | Dataset horaire multitache | Dataset de modelisation |
-| `B60A.1` | Audit de representation/features | Redondance et qualite des variables |
-| `B60A.2` | Audit du signal predictif | Signal stable par cible/fold |
-| `B60B` | Benchmark series temporelles | Comparaison baselines/NHITS/PatchTST |
-| `B60C` | Landmarks operationnels d'escales | Dataset temps restant/risque |
-| `B60C-H` | Contexte evenementiel historique | Features calendrier/evenements |
-| `B61A` | Completion gouvernee des donnees | Dataset enrichi sans imputation cible |
-| `B61A-X` | Augmentation gouvernee de queue rare | Challenger pondere separe |
-| `B61B-v2` | Modelisation multitache hybride | Predictions risque/temps restant |
-| `B61B-v2.1` | Recalibration sans reentrainement | Probabilites/intervalles recalibres |
-| `B61C` | Replay historique et API shadow | Decisions temporelles rejouees |
-| `B61D` | Famille HSMM et politiques d'etat | Etats latents et politiques challenger |
-| `B61E` | Ranking temporel sous capacite | Watchlist top-k |
-| `B62` | Cascade meteo -> vagues -> navires | Previsions probabilistes |
-| `B62A` | Augmentation meteo-marine gouvernee | Challenger de queue/stress |
-| `B62B` | Validation vintage/fresh-forward | Confirmation shadow |
+| Famille     | Fonction                                 | Sortie principale                      |
+| ----------- | ---------------------------------------- | -------------------------------------- |
+| `B58C-D`    | Collecte horaire meteo/marine issue-time | Snapshots immuables + lignes forecast  |
+| `B59A`      | Audit des appels portuaires dynamiques   | Rapport de disponibilite/qualite       |
+| `B60A`      | Dataset horaire multitache               | Dataset de modelisation                |
+| `B60A.1`    | Audit de representation/features         | Redondance et qualite des variables    |
+| `B60A.2`    | Audit du signal predictif                | Signal stable par cible/fold           |
+| `B60B`      | Benchmark series temporelles             | Comparaison baselines/NHITS/PatchTST   |
+| `B60C`      | Landmarks operationnels d'escales        | Dataset temps restant/risque           |
+| `B60C-H`    | Contexte evenementiel historique         | Features calendrier/evenements         |
+| `B61A`      | Completion gouvernee des donnees         | Dataset enrichi sans imputation cible  |
+| `B61A-X`    | Augmentation gouvernee de queue rare     | Challenger pondere separe              |
+| `B61B-v2`   | Modelisation multitache hybride          | Predictions risque/temps restant       |
+| `B61B-v2.1` | Recalibration sans reentrainement        | Probabilites/intervalles recalibres    |
+| `B61C`      | Replay historique et API shadow          | Decisions temporelles rejouees         |
+| `B61D`      | Famille HSMM et politiques d'etat        | Etats latents et politiques challenger |
+| `B61E`      | Ranking temporel sous capacite           | Watchlist top-k                        |
+| `B62`       | Cascade meteo -> vagues -> navires       | Previsions probabilistes               |
+| `B62A`      | Augmentation meteo-marine gouvernee      | Challenger de queue/stress             |
+| `B62B`      | Validation vintage/fresh-forward         | Confirmation shadow                    |
 
 Ces codes sont des identifiants de recherche et d'exploitation. Ils ne doivent pas apparaitre
 dans les ecrans destines aux operateurs.
@@ -238,13 +238,13 @@ indexes par temps, mais toutes les tables ne doivent pas devenir des hypertables
 
 Organisation logique recommandee :
 
-| Schema | Contenu |
-|---|---|
-| `bronze` | References et metadonnees de collecte, pas les gros payloads JSON. |
-| `core` | Entites nettoyees : escales, navires, observations, forecasts. |
-| `feature` | Landmarks et features disponibles a un instant de decision. |
-| `ml` | Predictions, calibrations, metriques et audits. |
-| `serving` | Vues/tables stables lues par FastAPI. |
+| Schema    | Contenu                                                            |
+| --------- | ------------------------------------------------------------------ |
+| `bronze`  | References et metadonnees de collecte, pas les gros payloads JSON. |
+| `core`    | Entites nettoyees : escales, navires, observations, forecasts.     |
+| `feature` | Landmarks et features disponibles a un instant de decision.        |
+| `ml`      | Predictions, calibrations, metriques et audits.                    |
+| `serving` | Vues/tables stables lues par FastAPI.                              |
 
 Le bootstrap SQL est present dans `backend/infra/timescaledb/init/` et plusieurs flows creent ou
 materialisent leurs tables versionnees. Les volumes de donnees ne sont pas dans Git : avant toute
@@ -272,15 +272,15 @@ production est autorisee. FastAPI doit lire les indicateurs de gouvernance assoc
 
 La plateforme doit conserver plusieurs temps distincts :
 
-| Champ | Sens |
-|---|---|
-| `issue_at` | Instant d'emission d'une prevision. |
-| `requested_at` | Instant de l'appel a la source. |
+| Champ          | Sens                                                   |
+| -------------- | ------------------------------------------------------ |
+| `issue_at`     | Instant d'emission d'une prevision.                    |
+| `requested_at` | Instant de l'appel a la source.                        |
 | `available_at` | Instant ou l'information est effectivement disponible. |
-| `valid_at` | Instant auquel la prevision s'applique. |
-| `landmark_at` | Instant d'observation d'une escale. |
-| `decision_at` | Instant de calcul de la recommandation. |
-| `target_at` | Instant futur utilise pour definir la cible. |
+| `valid_at`     | Instant auquel la prevision s'applique.                |
+| `landmark_at`  | Instant d'observation d'une escale.                    |
+| `decision_at`  | Instant de calcul de la recommandation.                |
+| `target_at`    | Instant futur utilise pour definir la cible.           |
 
 Regles critiques :
 
@@ -447,7 +447,7 @@ GET /api/v1/maritime/capacity-ranking/snapshot
 GET /api/v1/maritime/capacity-ranking/port-calls/{port_call_id}/timeline
 ```
 
-Les schemas exacts cote frontend sont dans `src/types/replay.ts`, `src/types/metocean.ts`,
+Les schemas exacts cote frontend sont dans `src/types/metocean.ts`,
 `src/types/liveMetocean.ts` et `src/types/capacity.ts`.
 
 ### 7.3 Champs de gouvernance obligatoires
@@ -495,8 +495,9 @@ sequenceDiagram
     C->>C: cache session + replay visuel
 ```
 
-Control Tower ne suit pas encore ce schema : ses donnees sont locales. C'est la dette fonctionnelle
-principale du frontend.
+Le frontend actif est volontairement limite a ces deux parcours. Les prochains modules du projet
+principal devront adopter le meme schema : contrat FastAPI versionne, etat indisponible explicite,
+annulation des requetes et interdiction d'afficher des donnees fictives comme des donnees reelles.
 
 ### 8.2 Etat et cache
 
@@ -529,13 +530,13 @@ Le script `deploy-live-metocean-ui.ps1` publie aussi les sources dans un contene
 
 ## 9. Reseau et configuration
 
-| Variable / adresse | Usage |
-|---|---|
-| `VITE_API_BASE_URL` | Base FastAPI compilee dans le bundle Vite. |
-| `http://localhost:8092` | FastAPI sur la machine hote. |
-| `http://localhost:8088` | Frontend Nginx. |
-| `http://localhost:4200` | Prefect UI. |
-| `http://localhost:9001` | Console MinIO. |
+| Variable / adresse      | Usage                                      |
+| ----------------------- | ------------------------------------------ |
+| `VITE_API_BASE_URL`     | Base FastAPI compilee dans le bundle Vite. |
+| `http://localhost:8092` | FastAPI sur la machine hote.               |
+| `http://localhost:8088` | Frontend Nginx.                            |
+| `http://localhost:4200` | Prefect UI.                                |
+| `http://localhost:9001` | Console MinIO.                             |
 
 Attention : les variables Vite sont injectees au build. Changer `VITE_API_BASE_URL` apres le build
 ne modifie pas automatiquement le JavaScript publie. Pour une configuration runtime, ajouter un
@@ -614,73 +615,48 @@ et interdiction de production.
 - tests loading/error/empty/cached ;
 - navigation clavier de la watchlist ;
 - coherence desktop/mobile ;
-- captures Playwright des trois routes ;
+- captures Playwright des deux routes publiees ;
 - absence de chevauchement et respect de `prefers-reduced-motion`.
 
 ## 13. Ce qui manque dans le depot GitHub actuel
 
-Pour permettre a une autre IA de reproduire toute la plateforme, il faut encore versionner :
+Le monorepo contient le frontend, FastAPI, les flows, le modeling et l'infrastructure. Il exclut
+volontairement les elements d'execution lourds ou sensibles :
 
 ```text
-services/platform_api/          FastAPI, routes, repositories SQL
-flows/                          flows et tasks Prefect
-db/migrations/                  schemas, tables, vues, index, contraintes
-contracts/                      schemas JSON/OpenAPI partages
-modeling/                       features, entrainement, calibration, evaluation
-infra/                          compose Docker et initialisation MinIO
-tests/backend/                  data, modeles et API
-docs/model_cards/               limites et metriques par version
+donnees portuaires reelles       evenements, escales, AIS et meteo interne
+artefacts de modeles             poids, calibrateurs et sorties volumineuses
+volumes persistants              TimescaleDB, MinIO, MLflow et Prefect
+secrets                          mots de passe et credentials fournisseurs
+fixtures contractuelles          jeux minimaux anonymises pour tests CI
 ```
 
-Sans ces elements, un clone de `portflow-maritime` reproduit l'interface, mais pas les predictions
-ni les pipelines.
+Un clone reproduit donc le code et le mode local explicite, mais pas les predictions historiques
+reelles sans restauration des donnees et artefacts gouvernes.
 
-## 14. Architecture cible recommandee
+## 14. Architecture de depot retenue
 
-Deux options correctes :
-
-### Option A - Monorepo
-
-```text
-smart-port-maritime/
-  apps/web/
-  services/platform_api/
-  flows/
-  modeling/
-  db/migrations/
-  contracts/
-  infra/
-  tests/
-  docs/
-```
-
-### Option B - Deux depots
-
-```text
-portflow-maritime-ui       React/Nginx
-smart-port-maritime-core   Prefect/FastAPI/DB/modeles/infra
-```
-
-Dans les deux cas, OpenAPI doit devenir le contrat source. Les types TypeScript doivent etre
-generes depuis OpenAPI ou verifies automatiquement en CI pour eviter la divergence API/UI.
+L'architecture officielle est un monorepo : React a la racine et la plateforme dans `backend/`.
+OpenAPI doit devenir le contrat source ; les types TypeScript doivent etre generes depuis OpenAPI
+ou verifies automatiquement en CI pour eviter la divergence API/UI.
 
 ## 15. Ordre de travail pour la prochaine IA
 
-1. Cloner le frontend et lire `FRONTEND_HANDOFF.md` puis ce document.
-2. Localiser ou creer le depot backend ; ne pas inventer son contenu.
+1. Cloner le monorepo et lire `FRONTEND_HANDOFF.md` puis ce document.
+2. Verifier les dependances backend et les artefacts de donnees disponibles ; ne pas inventer leur contenu.
 3. Exporter le schema OpenAPI de FastAPI et comparer avec `src/types`.
 4. Exporter la liste reelle des schemas/tables/index TimescaleDB.
 5. Inventorier les deployments Prefect et leurs chemins sources.
 6. Reproduire un run complet sur un petit echantillon.
-7. Connecter Control Tower aux endpoints reellement disponibles.
-8. Unifier la coque visuelle et supprimer les donnees fictives trompeuses.
+7. Construire chaque nouvelle interface sur un contrat OpenAPI valide et une source gouvernee.
+8. Reutiliser la coque visuelle commune et refuser les donnees fictives trompeuses.
 9. Ajouter tests de contrat et CI avant toute nouvelle fonctionnalite.
 10. Ne promouvoir aucune politique tant que la validation fresh-forward n'est pas suffisante.
 
 ## 16. Checklist de passation
 
 - [ ] Le frontend build avec `pnpm build`.
-- [ ] Les trois routes repondent via Nginx.
+- [ ] Les deux routes publiees repondent via Nginx.
 - [ ] FastAPI `/health` et `/docs` sont accessibles.
 - [ ] Les contrats TypeScript correspondent a OpenAPI.
 - [ ] TimescaleDB contient des tables serving versionnees.
@@ -694,13 +670,12 @@ generes depuis OpenAPI ou verifies automatiquement en CI pour eviter la divergen
 
 ## 17. References dans ce depot
 
-- `FRONTEND_HANDOFF.md` : fonctionnement metier et visuel des trois pages.
+- `FRONTEND_HANDOFF.md` : fonctionnement metier et visuel des deux pages actives.
 - `README.md` : demarrage rapide du frontend.
 - `DESIGN_SYSTEM.md` : regles visuelles.
 - `src/services/` : endpoints effectivement appeles.
 - `src/types/` : contrats JSON attendus.
 - `src/pages/maritime/` : orchestration des pages.
 - `src/components/sections/maritime/` : cartes et graphiques.
-- `src/providers/ReplayProvider.tsx` : client replay actuellement global mais peu utilise.
 - `Dockerfile` et `nginx.conf` : build et publication.
 - `deploy-live-metocean-ui.ps1` : procedure locale de publication/verifications.

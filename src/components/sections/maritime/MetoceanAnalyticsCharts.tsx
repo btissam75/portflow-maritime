@@ -41,35 +41,60 @@ const groupForecast = (points: MetoceanForecastPoint[], variable: string) =>
     .sort((left, right) => left.horizon_h - right.horizon_h);
 
 const baseOption = (labels: string[]) => ({
-  animationDuration: 1200,
+  animationDuration: 1350,
   animationDurationUpdate: 700,
   animationEasing: 'cubicOut',
   animationEasingUpdate: 'cubicInOut',
   tooltip: {
     trigger: 'axis',
-    backgroundColor: pf.background.navigation,
-    borderColor: pf.map.road,
+    padding: [12, 14],
+    backgroundColor: 'rgba(5,20,31,.97)',
+    borderColor: 'rgba(110,214,229,.34)',
     borderWidth: 1,
+    extraCssText: 'border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.4);',
     textStyle: { color: pf.text.primary, fontFamily: 'Inter, Segoe UI, sans-serif' },
-    axisPointer: { type: 'line', lineStyle: { color: pf.functional.cyan, opacity: 0.45 } },
+    axisPointer: {
+      type: 'line',
+      snap: true,
+      lineStyle: { color: pf.functional.cyan, opacity: 0.7, type: 'dashed' },
+      label: { show: true, color: '#06121C', backgroundColor: pf.functional.cyan },
+    },
   },
   legend: {
     top: 0,
     left: 0,
-    itemWidth: 18,
-    itemHeight: 3,
-    textStyle: { color: chartText, fontSize: 11 },
+    itemWidth: 20,
+    itemHeight: 4,
+    itemGap: 16,
+    icon: 'roundRect',
+    textStyle: { color: chartText, fontSize: 10.5 },
+    inactiveColor: pf.text.disabled,
   },
-  grid: { top: 46, left: 12, right: 14, bottom: 32, containLabel: true },
+  grid: { top: 48, left: 12, right: 14, bottom: 58, containLabel: true },
   xAxis: {
     type: 'category' as const,
     boundaryGap: false,
     data: labels,
     axisTick: { show: false },
-    axisLabel: { color: chartText, hideOverlap: true, fontSize: 10 },
+    axisLabel: { color: chartText, hideOverlap: true, fontSize: 9.5, margin: 12 },
     axisLine: { lineStyle: { color: pf.map.outline } },
   },
-  dataZoom: [{ type: 'inside', start: 0, end: 100 }],
+  dataZoom: [
+    { type: 'inside', start: 0, end: 100, zoomOnMouseWheel: true, moveOnMouseMove: true },
+    {
+      type: 'slider',
+      start: 0,
+      end: 100,
+      bottom: 4,
+      height: 17,
+      borderColor: 'rgba(137,167,180,.18)',
+      backgroundColor: 'rgba(6,18,28,.55)',
+      fillerColor: 'rgba(54,214,207,.18)',
+      handleStyle: { color: pf.functional.cyan, borderColor: pf.functional.cyan },
+      moveHandleStyle: { color: pf.functional.cyan },
+      textStyle: { color: pf.text.tertiary, fontSize: 8 },
+    },
+  ],
 });
 
 const axis = (name: string, side: 'left' | 'right' = 'left') => ({
@@ -110,6 +135,7 @@ const line = (
       }
     : undefined,
   emphasis: { focus: 'series' },
+  blur: { lineStyle: { opacity: 0.2 }, areaStyle: { opacity: 0.04 } },
   animationDuration: 1100,
   animationDelay: (index: number) => Math.min(index * 12, 360),
   data,
@@ -145,7 +171,9 @@ export const MetoceanProjectionChart = ({
     const marineByTime = new Map(marineTimes.map((time, index) => [time, index]));
     const selected = Array.from(new Set([...atmosphereTimes, ...marineTimes]))
       .map((time) => ({ time, stamp: new Date(time).getTime() }))
-      .filter((point) => Number.isFinite(point.stamp) && point.stamp >= start && point.stamp <= end);
+      .filter(
+        (point) => Number.isFinite(point.stamp) && point.stamp >= start && point.stamp <= end,
+      );
     selected.sort((left, right) => left.stamp - right.stamp);
     const labels = selected.map((point) =>
       new Date(point.time).toLocaleString('fr-FR', {
@@ -154,6 +182,55 @@ export const MetoceanProjectionChart = ({
         timeZone: 'Africa/Casablanca',
       }),
     );
+    const nowIndex = selected.reduce((best, point, index) => {
+      if (best < 0) return index;
+      return Math.abs(point.stamp - now) < Math.abs(selected[best].stamp - now) ? index : best;
+    }, -1);
+    const nowLabel = labels[Math.max(0, nowIndex)];
+    const phaseGuides = labels.length
+      ? {
+          markArea: {
+            silent: true,
+            label: { show: true, position: 'insideTop', fontSize: 9, fontWeight: 800 },
+            data: [
+              [
+                {
+                  name: 'OBSERVÉ',
+                  xAxis: labels[0],
+                  itemStyle: { color: 'rgba(84,227,178,.035)' },
+                  label: { color: '#71DDB0' },
+                },
+                { xAxis: nowLabel },
+              ],
+              [
+                {
+                  name: 'PRÉVU',
+                  xAxis: nowLabel,
+                  itemStyle: { color: 'rgba(141,145,255,.05)' },
+                  label: { color: '#AAA7FF' },
+                },
+                { xAxis: labels[labels.length - 1] },
+              ],
+            ],
+          },
+          markLine: {
+            silent: true,
+            symbol: 'none',
+            label: {
+              show: true,
+              formatter: 'MAINTENANT',
+              color: '#06121C',
+              backgroundColor: '#EAF7F8',
+              borderRadius: 7,
+              padding: [4, 7],
+              fontSize: 8,
+              fontWeight: 800,
+            },
+            lineStyle: { color: '#EAF7F8', width: 1.2, type: 'dashed', opacity: 0.72 },
+            data: [{ xAxis: nowLabel }],
+          },
+        }
+      : {};
 
     const splitSeries = (
       values: Array<number | null>,
@@ -198,18 +275,33 @@ export const MetoceanProjectionChart = ({
 
     if (focus !== 'WAVES') {
       series.push(
-        { ...line('Température observée', temperature.observed, pf.functional.amber, 0, false), lineStyle: { color: pf.functional.amber, width: 3 } },
-        { ...line('Température prévue', temperature.forecast, pf.functional.blue, 0, true), lineStyle: { color: pf.functional.blue, width: 3.2, type: 'dashed' }, z: 5 },
+        {
+          ...line('Température observée', temperature.observed, pf.functional.amber, 0, false),
+          lineStyle: { color: pf.functional.amber, width: 3 },
+          ...phaseGuides,
+        },
+        {
+          ...line('Température prévue', temperature.forecast, pf.functional.blue, 0, true),
+          lineStyle: { color: pf.functional.blue, width: 3.2, type: 'dashed' },
+          z: 5,
+        },
       );
       if (focus === 'TEMPERATURE') {
-        series.push({ ...line('Ressenti prévu', apparent.forecast, pf.functional.purple), lineStyle: { color: pf.functional.purple, width: 2, type: 'dotted' } });
+        series.push({
+          ...line('Ressenti prévu', apparent.forecast, pf.functional.purple),
+          lineStyle: { color: pf.functional.purple, width: 2, type: 'dotted' },
+        });
       }
     }
 
     if (focus !== 'TEMPERATURE') {
       const waveAxisIndex = focus === 'COMBINED' ? 1 : 0;
       series.push(
-        { ...line('Vague observée', wave.observed, pf.functional.cyan, waveAxisIndex), lineStyle: { color: pf.functional.cyan, width: 3 } },
+        {
+          ...line('Vague observée', wave.observed, pf.functional.cyan, waveAxisIndex),
+          lineStyle: { color: pf.functional.cyan, width: 3 },
+          ...(focus === 'WAVES' ? phaseGuides : {}),
+        },
         {
           ...line('Vague prévue', wave.forecast, pf.functional.blue, waveAxisIndex, true),
           lineStyle: { color: pf.functional.blue, width: 3.2, type: 'dashed' },
@@ -217,14 +309,21 @@ export const MetoceanProjectionChart = ({
           markLine: {
             silent: true,
             symbol: 'none',
-            label: { formatter: `Seuil ${waveThreshold.toFixed(1)} m`, color: pf.functional.amber, fontSize: 10 },
+            label: {
+              formatter: `Seuil ${waveThreshold.toFixed(1)} m`,
+              color: pf.functional.amber,
+              fontSize: 10,
+            },
             lineStyle: { color: pf.functional.amber, type: 'dotted', width: 1.8 },
             data: [{ yAxis: waveThreshold }],
           },
         },
       );
       if (focus === 'WAVES') {
-        series.push({ ...line('Houle prévue', swell.forecast, pf.functional.purple), lineStyle: { color: pf.functional.purple, width: 2, type: 'dotted' } });
+        series.push({
+          ...line('Houle prévue', swell.forecast, pf.functional.purple),
+          lineStyle: { color: pf.functional.purple, width: 2, type: 'dotted' },
+        });
       }
     }
 
@@ -237,8 +336,11 @@ export const MetoceanProjectionChart = ({
         itemHeight: 3,
         textStyle: { color: chartText, fontSize: 10 },
       },
-      grid: { top: 52, left: 12, right: 16, bottom: 42, containLabel: true },
-      yAxis: focus === 'COMBINED' ? [temperatureAxis, waveAxis] : [focus === 'TEMPERATURE' ? temperatureAxis : waveAxis],
+      grid: { top: 62, left: 12, right: 16, bottom: 60, containLabel: true },
+      yAxis:
+        focus === 'COMBINED'
+          ? [temperatureAxis, waveAxis]
+          : [focus === 'TEMPERATURE' ? temperatureAxis : waveAxis],
       series,
     };
   }, [focus, horizonHours, liveAtmosphere, liveMarine, temperatureUnit, waveThreshold]);
@@ -278,8 +380,19 @@ export const AtmosphereAnalyticsChart = ({
       ...baseOption(labels),
       yAxis: [axis('°C'), axis('m/s', 'right')],
       series: [
-        line('Température', temperature.map((point) => point.p50), pf.functional.amber, 0, true),
-        line('Vent', wind.map((point) => point.p50), pf.functional.cyan, 1),
+        line(
+          'Température',
+          temperature.map((point) => point.p50),
+          pf.functional.amber,
+          0,
+          true,
+        ),
+        line(
+          'Vent',
+          wind.map((point) => point.p50),
+          pf.functional.cyan,
+          1,
+        ),
       ],
     };
   }, [forecast, live, mode]);
@@ -300,14 +413,107 @@ export const MarineAnalyticsChart = ({
 }) => {
   const option = useMemo(() => {
     if (mode === 'NEXT_24H') {
-      const labels = (live?.time ?? []).map(formatHour);
+      const now = Date.now();
+      const start = now - 24 * 60 * 60 * 1000;
+      const end = now + 24 * 60 * 60 * 1000;
+      const selected = (live?.time ?? [])
+        .map((time, index) => ({ time, index, stamp: new Date(time).getTime() }))
+        .filter((point) => point.stamp >= start && point.stamp <= end);
+      const labels = selected.map((point) =>
+        new Date(point.time).toLocaleString('fr-FR', {
+          weekday: 'short',
+          hour: '2-digit',
+          timeZone: 'Africa/Casablanca',
+        }),
+      );
+      const split = (values: Array<number | null>) => ({
+        observed: selected.map((point) =>
+          point.stamp <= now ? values[point.index] ?? null : null,
+        ),
+        forecast: selected.map((point) =>
+          point.stamp >= now ? values[point.index] ?? null : null,
+        ),
+      });
+      const wave = split(live?.wave_height ?? []);
+      const swell = split(live?.swell_wave_height ?? []);
+      const period = split(live?.wave_period ?? []);
+      const nowIndex = selected.reduce((best, point, index) => {
+        if (best < 0) return index;
+        return Math.abs(point.stamp - now) < Math.abs(selected[best].stamp - now) ? index : best;
+      }, -1);
+      const nowLabel = labels[Math.max(0, nowIndex)];
+      const marinePhases = labels.length
+        ? {
+            markArea: {
+              silent: true,
+              label: { show: true, position: 'insideTop', fontSize: 9, fontWeight: 800 },
+              data: [
+                [
+                  {
+                    name: 'OBSERVÉ',
+                    xAxis: labels[0],
+                    itemStyle: { color: 'rgba(84,227,178,.04)' },
+                    label: { color: '#71DDB0' },
+                  },
+                  { xAxis: nowLabel },
+                ],
+                [
+                  {
+                    name: 'PRÉVU',
+                    xAxis: nowLabel,
+                    itemStyle: { color: 'rgba(141,145,255,.055)' },
+                    label: { color: '#AAA7FF' },
+                  },
+                  { xAxis: labels[labels.length - 1] },
+                ],
+              ],
+            },
+            markLine: {
+              silent: true,
+              symbol: 'none',
+              label: {
+                formatter: 'MAINTENANT',
+                color: '#06121C',
+                backgroundColor: '#EAF7F8',
+                borderRadius: 7,
+                padding: [4, 7],
+                fontSize: 8,
+                fontWeight: 800,
+              },
+              lineStyle: { color: '#EAF7F8', type: 'dashed', opacity: 0.7 },
+              data: [{ xAxis: nowLabel }],
+            },
+          }
+        : {};
       return {
         ...baseOption(labels),
         yAxis: [axis('m'), axis('s', 'right')],
         series: [
-          line('Vague totale', live?.wave_height ?? [], pf.functional.blue, 0, true),
-          line('Houle', live?.swell_wave_height ?? [], pf.functional.cyan),
-          line('Période', live?.wave_period ?? [], pf.functional.purple, 1),
+          {
+            ...line('Vague · observée', wave.observed, '#35D7F2', 0, true),
+            lineStyle: { color: '#35D7F2', width: 3.2 },
+            ...marinePhases,
+          },
+          {
+            ...line('Vague · prévue', wave.forecast, '#49A7FF', 0, true),
+            lineStyle: { color: '#49A7FF', width: 3.2, type: 'dashed' },
+          },
+          {
+            ...line('Houle · observée', swell.observed, '#54E3B2'),
+            lineStyle: { color: '#54E3B2', width: 2.2 },
+          },
+          {
+            ...line('Houle · prévue', swell.forecast, '#9A91FF'),
+            lineStyle: { color: '#9A91FF', width: 2.4, type: 'dashed' },
+          },
+          {
+            ...line('Période · observée', period.observed, '#F4C76A', 1),
+            lineStyle: { color: '#F4C76A', width: 1.9 },
+          },
+          {
+            ...line('Période · prévue', period.forecast, '#FF9F68', 1),
+            lineStyle: { color: '#FF9F68', width: 2.1, type: 'dashed' },
+          },
         ],
       };
     }
@@ -319,8 +525,19 @@ export const MarineAnalyticsChart = ({
       ...baseOption(labels),
       yAxis: [axis('m'), axis('s', 'right')],
       series: [
-        line('Vague', wave.map((point) => point.p50), pf.functional.blue, 0, true),
-        line('Période', period.map((point) => point.p50), pf.functional.purple, 1),
+        line(
+          'Vague',
+          wave.map((point) => point.p50),
+          pf.functional.blue,
+          0,
+          true,
+        ),
+        line(
+          'Période',
+          period.map((point) => point.p50),
+          pf.functional.purple,
+          1,
+        ),
       ],
     };
   }, [forecast, live, mode]);
@@ -328,13 +545,7 @@ export const MarineAnalyticsChart = ({
   return <ReactEchart echarts={echarts} option={option} sx={{ width: 1, height }} />;
 };
 
-export const KpiSparkline = ({
-  data,
-  color,
-}: {
-  data: Array<number | null>;
-  color: string;
-}) => {
+export const KpiSparkline = ({ data, color }: { data: Array<number | null>; color: string }) => {
   const option = useMemo(
     () => ({
       animationDuration: 1150,
@@ -342,17 +553,21 @@ export const KpiSparkline = ({
       grid: { top: 5, left: 1, right: 1, bottom: 3 },
       xAxis: { type: 'category', show: false, data: data.map((_, index) => index) },
       yAxis: { type: 'value', show: false, scale: true },
-      series: [{
-        ...line('', data, color, 0, true),
-        lineStyle: { color, width: 3, cap: 'round', join: 'round' },
-        symbolSize: 6,
-        showSymbol: false,
-      }],
+      series: [
+        {
+          ...line('', data, color, 0, true),
+          lineStyle: { color, width: 3, cap: 'round', join: 'round' },
+          symbolSize: 6,
+          showSymbol: false,
+        },
+      ],
     }),
     [color, data],
   );
 
-  return <ReactEchart echarts={echarts} option={option} sx={{ width: 1, height: 58, flexShrink: 0 }} />;
+  return (
+    <ReactEchart echarts={echarts} option={option} sx={{ width: 1, height: 58, flexShrink: 0 }} />
+  );
 };
 
 export const MarineCompositionDonut = ({
@@ -385,13 +600,20 @@ export const MarineCompositionDonut = ({
         subtext: 'VAGUE TOTALE',
         left: 'center',
         top: '37%',
-        textStyle: { color: pf.text.primary, fontSize: 22, fontWeight: 600, fontFamily: 'Inter, sans-serif' },
+        textStyle: {
+          color: pf.text.primary,
+          fontSize: 22,
+          fontWeight: 600,
+          fontFamily: 'Inter, sans-serif',
+        },
         subtextStyle: { color: chartText, fontSize: 9, fontWeight: 700 },
       },
       tooltip: {
         trigger: 'item',
         formatter: (params: { name: string; percent: number }) =>
-          params.name === 'Indisponible' ? 'Composition indisponible' : `${params.name}<br/><b>${params.percent.toFixed(0)} %</b> de l'énergie`,
+          params.name === 'Indisponible'
+            ? 'Composition indisponible'
+            : `${params.name}<br/><b>${params.percent.toFixed(0)} %</b> de l'énergie`,
         backgroundColor: 'rgba(13,16,27,0.96)',
         borderColor: 'rgba(255,255,255,0.12)',
         textStyle: { color: '#F1F4F9' },
@@ -431,8 +653,8 @@ export const ExposureBarChart = ({
   height?: number;
 }) => {
   const option = useMemo(() => {
-    let labels: string[] = [];
-    let values: number[] = [];
+    const labels: string[] = [];
+    const values: number[] = [];
 
     if (mode === 'NEXT_24H') {
       const times = liveAtmosphere?.time ?? liveMarine?.time ?? [];
@@ -450,12 +672,16 @@ export const ExposureBarChart = ({
     } else {
       const wave = groupForecast(forecast, 'wave_height_m');
       const wind = groupForecast(forecast, 'wind_speed_ms');
-      const horizons = Array.from(new Set([...wave, ...wind].map((point) => point.horizon_h))).sort((a, b) => a - b);
+      const horizons = Array.from(new Set([...wave, ...wind].map((point) => point.horizon_h))).sort(
+        (a, b) => a - b,
+      );
       horizons.forEach((horizon) => {
         const waveValue = wave.find((point) => point.horizon_h === horizon)?.p50 ?? 0;
         const windValue = wind.find((point) => point.horizon_h === horizon)?.p50 ?? 0;
         labels.push(`H+${horizon}`);
-        values.push(Math.round(Math.min(100, Math.max((waveValue / 2.5) * 100, (windValue / 20) * 100))));
+        values.push(
+          Math.round(Math.min(100, Math.max((waveValue / 2.5) * 100, (windValue / 20) * 100))),
+        );
       });
     }
 

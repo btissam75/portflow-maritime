@@ -8,27 +8,13 @@ import type {
   MetoceanValidationStatus,
   MetoceanVesselImpact,
 } from 'types/metocean';
+import { getJson } from 'services/http';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(
-  /\/$/,
-  '',
-);
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
 const B62_ROOT = `${API_BASE_URL}/api/v1/maritime/metocean-cascade`;
 const B62A_ROOT = `${API_BASE_URL}/api/v1/maritime/metocean-augmentation`;
 const B62B_ROOT = `${API_BASE_URL}/api/v1/maritime/metocean-vintage-validation`;
-
-async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(url, {
-    headers: { Accept: 'application/json' },
-    signal,
-  });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(body || `API request failed with status ${response.status}`);
-  }
-  return response.json() as Promise<T>;
-}
 
 async function getForecast(signal?: AbortSignal) {
   const tracks: MetoceanForecastPoint['track'][] = [
@@ -40,10 +26,11 @@ async function getForecast(signal?: AbortSignal) {
     try {
       const forecast = await getJson<MetoceanForecastPoint[]>(
         `${B62_ROOT}/forecast?track=${track}&limit=2000`,
-        signal,
+        { signal, sourceLabel: 'La prévision météo-marine gouvernée' },
       );
       return { forecast, track };
     } catch (error) {
+      if (signal?.aborted) throw new DOMException('Requête annulée', 'AbortError');
       lastError = error;
     }
   }
@@ -59,23 +46,43 @@ const settledValue = <T>(result: PromiseSettledResult<T>, unavailable: string[],
 export const metoceanApi = {
   async getDashboard(signal?: AbortSignal): Promise<MetoceanDashboardData> {
     const results = await Promise.allSettled([
-      getJson<MetoceanStatus>(`${B62_ROOT}/status`, signal),
+      getJson<MetoceanStatus>(`${B62_ROOT}/status`, {
+        signal,
+        sourceLabel: 'Le statut du modèle météo-marin',
+      }),
       getForecast(signal),
-      getJson<MetoceanVesselImpact[]>(`${B62_ROOT}/vessel-impact?limit=500`, signal),
-      getJson<MetoceanAugmentationStatus>(`${B62A_ROOT}/status`, signal),
-      getJson<MetoceanTaskSelection[]>(`${B62A_ROOT}/selection`, signal),
-      getJson<MetoceanValidationStatus>(`${B62B_ROOT}/status`, signal),
-      getJson<MetoceanMetric[]>(`${B62B_ROOT}/metrics`, signal),
+      getJson<MetoceanVesselImpact[]>(`${B62_ROOT}/vessel-impact?limit=500`, {
+        signal,
+        sourceLabel: 'Les impacts sur les navires',
+      }),
+      getJson<MetoceanAugmentationStatus>(`${B62A_ROOT}/status`, {
+        signal,
+        sourceLabel: 'Le statut du challenger météo-marin',
+      }),
+      getJson<MetoceanTaskSelection[]>(`${B62A_ROOT}/selection`, {
+        signal,
+        sourceLabel: 'La sélection des modèles météo-marins',
+      }),
+      getJson<MetoceanValidationStatus>(`${B62B_ROOT}/status`, {
+        signal,
+        sourceLabel: 'La validation temporelle météo-marine',
+      }),
+      getJson<MetoceanMetric[]>(`${B62B_ROOT}/metrics`, {
+        signal,
+        sourceLabel: 'Les métriques météo-marines',
+      }),
     ] as const);
 
+    if (signal?.aborted) throw new DOMException('Requête annulée', 'AbortError');
+
     const unavailable: string[] = [];
-    const status = settledValue(results[0], unavailable, 'statut B62');
-    const forecastResult = settledValue(results[1], unavailable, 'prévisions B62');
+    const status = settledValue(results[0], unavailable, 'statut de prévision scientifique');
+    const forecastResult = settledValue(results[1], unavailable, 'prévision scientifique');
     const impacts = settledValue(results[2], unavailable, 'impacts navires');
-    const augmentation = settledValue(results[3], unavailable, 'statut B62A');
-    const selections = settledValue(results[4], unavailable, 'sélection B62A');
-    const validation = settledValue(results[5], unavailable, 'validation B62B');
-    const metrics = settledValue(results[6], unavailable, 'métriques B62B');
+    const augmentation = settledValue(results[3], unavailable, 'statut du challenger');
+    const selections = settledValue(results[4], unavailable, 'sélection du challenger');
+    const validation = settledValue(results[5], unavailable, 'validation fresh-forward');
+    const metrics = settledValue(results[6], unavailable, 'métriques de validation');
 
     return {
       status,

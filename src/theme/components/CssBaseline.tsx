@@ -9,13 +9,14 @@ const CssBaseline: Components<Omit<Theme, 'components'>>['MuiCssBaseline'] = {
       fontVariantLigatures: 'none',
       fontVariantNumeric: 'tabular-nums',
       letterSpacing: 0,
-      color: '#EDF7F9',
-      background: 'radial-gradient(circle at 55% -10%, rgba(30,92,116,0.24) 0%, rgba(8,25,37,0.92) 35%, #06121C 72%)',
+      color: '#F4F1EA',
+      background:
+        'radial-gradient(circle at 12% -8%, rgba(242,184,75,.10), transparent 29%), radial-gradient(circle at 82% 0%, rgba(165,139,250,.07), transparent 31%), linear-gradient(145deg, #0B0D10, #111318 48%, #090A0D)',
       ...scrollbar(theme),
     },
     '::selection': {
-      color: '#06121C',
-      backgroundColor: '#36D6CF',
+      color: '#0B0D10',
+      backgroundColor: '#55D6C2',
     },
     '@keyframes portflowPulse': {
       '0%, 100%': { transform: 'scale(1)', opacity: 1 },

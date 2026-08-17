@@ -1,84 +1,164 @@
 import { useMemo } from 'react';
 import * as echarts from 'echarts/core';
-import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
-import { LineChart } from 'echarts/charts';
+import {
+  DataZoomComponent,
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+} from 'echarts/components';
+import { BarChart, LineChart } from 'echarts/charts';
 import { CanvasRenderer } from 'echarts/renderers';
 import ReactEchart from 'components/base/ReactEhart';
-import useReducedMotion from 'hooks/useReducedMotion';
+import type { TowerForecastPoint } from 'types/controlTower';
 import { portflowPalette as pf } from 'theme/portflowPalette';
 
-echarts.use([TooltipComponent, LegendComponent, GridComponent, LineChart, CanvasRenderer]);
+echarts.use([
+  DataZoomComponent,
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+  BarChart,
+  LineChart,
+  CanvasRenderer,
+]);
 
-const labels = ['-6 h', '-4 h', '-2 h', 'Maintenant', '+2 h', '+4 h', '+6 h', '+8 h', '+10 h', '+12 h'];
-const realized = [21, 23, 25, 27, null, null, null, null, null, null];
-const p50 = [null, null, null, 27, 29, 31, 34, 36, 38, 41];
-const p10 = [null, null, null, 27, 26, 28, 30, 31, 33, 35];
-const p90 = [null, null, null, 27, 33, 36, 39, 43, 46, 51];
-
-const ControlTowerForecastChart = ({ height = 220 }: { height?: number }) => {
-  const reducedMotion = useReducedMotion();
-  const option = useMemo(() => ({
-    animation: !reducedMotion,
-    animationDuration: 620,
-    animationEasing: 'cubicOut',
-    tooltip: {
-      trigger: 'axis',
-      backgroundColor: pf.background.navigation,
-      borderColor: pf.map.road,
-      borderWidth: 1,
-      padding: 10,
-      textStyle: { color: pf.text.primary, fontFamily: 'Inter, sans-serif', fontSize: 12 },
-      axisPointer: { type: 'line', lineStyle: { color: pf.functional.cyan, opacity: 0.45 } },
-    },
-    legend: {
-      top: 2,
-      right: 6,
-      itemWidth: 18,
-      itemHeight: 4,
-      textStyle: { color: pf.text.secondary, fontSize: 11 },
-      data: ['Réalisé', 'P50', 'P10–P90'],
-    },
-    grid: { left: 42, right: 20, top: 36, bottom: 28 },
-    xAxis: {
-      type: 'category',
-      boundaryGap: false,
-      data: labels,
-      axisLine: { lineStyle: { color: pf.map.outline } },
-      axisTick: { show: false },
-      axisLabel: { color: pf.text.secondary, fontSize: 11, hideOverlap: true },
-    },
-    yAxis: {
-      type: 'value',
-      name: 'unités / h',
-      min: 15,
-      nameTextStyle: { color: pf.text.tertiary, fontSize: 11 },
-      axisLabel: { color: pf.text.secondary, fontSize: 11 },
-      splitLine: { lineStyle: { color: pf.structure.divider } },
-    },
-    series: [
-      {
-        name: 'Réalisé', type: 'line', data: realized, smooth: 0.28, showSymbol: false,
-        lineStyle: { color: pf.text.primary, width: 2 }, itemStyle: { color: pf.text.primary },
+const ControlTowerForecastChart = ({
+  data,
+  height = 390,
+}: {
+  data: TowerForecastPoint[];
+  height?: number;
+}) => {
+  const option = useMemo(() => {
+    const labels = data.map((point) => `H+${point.horizon_h}`);
+    const band = data.map((point) => point.backlog_p90 - point.backlog_p10);
+    return {
+      animationDuration: 1200,
+      animationEasing: 'cubicOut',
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(13,15,18,.97)',
+        borderColor: 'rgba(85,214,194,.35)',
+        borderWidth: 1,
+        padding: [12, 14],
+        extraCssText: 'border-radius:12px;box-shadow:0 18px 45px rgba(0,0,0,.4)',
+        textStyle: { color: pf.text.primary },
       },
-      {
-        name: 'Base P10', type: 'line', stack: 'band', data: p10, showSymbol: false, silent: true,
-        lineStyle: { opacity: 0 }, areaStyle: { opacity: 0 }, tooltip: { show: false },
+      legend: {
+        top: 0,
+        left: 0,
+        itemWidth: 18,
+        itemHeight: 4,
+        textStyle: { color: pf.text.secondary, fontSize: 10 },
       },
-      {
-        name: 'P10–P90', type: 'line', stack: 'band', showSymbol: false, silent: true,
-        data: p90.map((value, index) => value == null || p10[index] == null ? null : value - (p10[index] as number)),
-        lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(73,167,255,0.22)' }, tooltip: { show: false },
+      grid: { top: 50, left: 12, right: 14, bottom: 54, containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: labels,
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: pf.structure.border } },
+        axisLabel: { color: pf.text.tertiary, fontSize: 9 },
       },
-      {
-        name: 'P50', type: 'line', data: p50, smooth: 0.3, showSymbol: false,
-        lineStyle: { color: pf.functional.cyan, width: 3 }, itemStyle: { color: pf.functional.cyan },
-      },
-      {
-        name: 'Seuil opérationnel', type: 'line', data: labels.map(() => 45), showSymbol: false, silent: true,
-        lineStyle: { color: pf.functional.amber, width: 1.5, type: 'dashed' }, tooltip: { show: false },
-      },
-    ],
-  }), [reducedMotion]);
+      yAxis: [
+        {
+          type: 'value',
+          name: 'Backlog / capacité',
+          nameTextStyle: { color: pf.text.tertiary, fontSize: 9 },
+          axisLabel: { color: pf.text.tertiary, fontSize: 9 },
+          splitLine: { lineStyle: { color: pf.structure.divider } },
+        },
+        {
+          type: 'value',
+          name: 'Flux horaire',
+          nameTextStyle: { color: pf.text.tertiary, fontSize: 9 },
+          axisLabel: { color: pf.text.tertiary, fontSize: 9 },
+          splitLine: { show: false },
+        },
+      ],
+      dataZoom: [
+        { type: 'inside', start: 0, end: 100 },
+        {
+          type: 'slider',
+          start: 0,
+          end: 100,
+          height: 16,
+          bottom: 4,
+          borderColor: pf.structure.border,
+          backgroundColor: 'rgba(8,9,11,.55)',
+          fillerColor: 'rgba(85,214,194,.15)',
+          handleStyle: { color: pf.functional.cyan },
+          textStyle: { color: pf.text.tertiary, fontSize: 8 },
+        },
+      ],
+      series: [
+        {
+          name: 'Borne basse',
+          type: 'line',
+          data: data.map((point) => point.backlog_p10),
+          stack: 'interval',
+          symbol: 'none',
+          lineStyle: { opacity: 0 },
+          areaStyle: { opacity: 0 },
+          tooltip: { show: false },
+        },
+        {
+          name: 'Incertitude',
+          type: 'line',
+          data: band,
+          stack: 'interval',
+          symbol: 'none',
+          lineStyle: { opacity: 0 },
+          areaStyle: { color: 'rgba(165,139,250,.18)' },
+        },
+        {
+          name: 'Backlog prévu',
+          type: 'line',
+          data: data.map((point) => point.backlog_p50),
+          smooth: 0.34,
+          symbol: 'circle',
+          symbolSize: 5,
+          lineStyle: { color: pf.functional.purple, width: 3.4 },
+          itemStyle: { color: pf.functional.purple },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(165,139,250,.22)' },
+              { offset: 1, color: 'rgba(165,139,250,.01)' },
+            ]),
+          },
+        },
+        {
+          name: 'Capacité normale',
+          type: 'line',
+          data: data.map((point) => point.normal_capacity),
+          symbol: 'none',
+          lineStyle: { color: pf.functional.amber, width: 2, type: 'dashed' },
+        },
+        {
+          name: 'Capacité renforcée',
+          type: 'line',
+          data: data.map((point) => point.reinforced_capacity),
+          symbol: 'none',
+          lineStyle: { color: pf.functional.green, width: 1.8, type: 'dotted' },
+        },
+        {
+          name: 'Arrivées',
+          type: 'bar',
+          yAxisIndex: 1,
+          data: data.map((point) => point.arrivals),
+          barMaxWidth: 8,
+          itemStyle: { color: 'rgba(112,166,232,.55)', borderRadius: [4, 4, 0, 0] },
+        },
+        {
+          name: 'Sorties',
+          type: 'bar',
+          yAxisIndex: 1,
+          data: data.map((point) => point.departures),
+          barMaxWidth: 8,
+          itemStyle: { color: 'rgba(85,214,194,.52)', borderRadius: [4, 4, 0, 0] },
+        },
+      ],
+    };
+  }, [data]);
 
   return <ReactEchart echarts={echarts} option={option} sx={{ width: 1, height }} />;
 };

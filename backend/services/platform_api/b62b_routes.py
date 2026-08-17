@@ -9,6 +9,8 @@ from fastapi import APIRouter, HTTPException, Query
 from psycopg2.pool import SimpleConnectionPool
 from pydantic import BaseModel
 
+from platform_api import local_demo
+
 
 MODEL_VERSION = "b62b-vintage-weather-wave-shadow-v1"
 AUDIT_SOURCE = "b62b_vintage_forecast_shadow_validation"
@@ -109,6 +111,32 @@ router = APIRouter(
 
 @router.get("/status", response_model=B62BStatus)
 def status() -> B62BStatus:
+    if local_demo.enabled():
+        return B62BStatus(
+            audit_status="DEMO",
+            decision="LOCAL_DEMO_VALIDATION_NOT_PRODUCTION",
+            model_version=local_demo.DEMO_METOCEAN_VERSION,
+            rows=sum(row["rows"] for row in local_demo.metocean_metrics()),
+            archive_origins=30,
+            valid_origins=30,
+            test_origins=0,
+            fresh_origins=18,
+            fresh_span_days=18.0,
+            selected_model="DEMO_TAIL_CHALLENGER",
+            reference_model="DEMO_REFERENCE",
+            valid_accepted=True,
+            archive_confirmed=False,
+            fresh_confirmed=False,
+            critical_gates_passed=True,
+            production_promotion_allowed=False,
+            limited_pilot_allowed=False,
+            automatic_action_allowed=False,
+            test_role="NOT_CONSUMED",
+            next_block="CONNECT_REAL_B62B_VINTAGES",
+            finished_at=local_demo.metocean_forecast(
+                "ISSUE_TIME_PROVIDER_OPERATIONAL_INPUT"
+            )[0]["issue_at"],
+        )
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -148,6 +176,11 @@ def status() -> B62BStatus:
 
 @router.get("/metrics", response_model=list[Metric])
 def metrics(evaluation_role: str | None = Query(default=None)) -> list[Metric]:
+    if local_demo.enabled():
+        rows = local_demo.metocean_metrics()
+        if evaluation_role is not None:
+            rows = [row for row in rows if row["evaluation_role"] == evaluation_role]
+        return [Metric(**row) for row in rows]
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             f"""
@@ -170,6 +203,26 @@ def predictions(
     model: str | None = Query(default=None),
     limit: int = Query(default=250, ge=1, le=2_000),
 ) -> list[Prediction]:
+    if local_demo.enabled():
+        if evaluation_role != "FRESH_FORWARD_CONFIRMATORY":
+            return []
+        rows = local_demo.metocean_forecast("ISSUE_TIME_PROVIDER_OPERATIONAL_INPUT")
+        selected_model = model or "DEMO_TAIL_CHALLENGER"
+        return [
+            Prediction(
+                evaluation_role=evaluation_role,
+                issue_at=row["issue_at"],
+                valid_at=row["valid_at"],
+                horizon_h=row["horizon_h"],
+                variable=row["variable"],
+                model=selected_model,
+                actual=None,
+                p10=row["p10"],
+                p50=row["p50"],
+                p90=row["p90"],
+            )
+            for row in rows[:limit]
+        ]
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             f"""
@@ -188,6 +241,20 @@ def predictions(
 
 @router.get("/model-card")
 def model_card() -> dict[str, Any]:
+    if local_demo.enabled():
+        return {
+            "model_version": local_demo.DEMO_METOCEAN_VERSION,
+            "decision": "LOCAL_DEMO_VALIDATION_NOT_PRODUCTION",
+            "selected_model": "DEMO_TAIL_CHALLENGER",
+            "selection_role": "DEMO_VALID_SELECTION",
+            "test_role": "NOT_CONSUMED",
+            "archive_role": "DEMO_CONFIRMATORY",
+            "fresh_role": "DEMO_FORWARD",
+            "production_contract": {"scientific_claim_allowed": False},
+            "production_promotion_allowed": False,
+            "automatic_action_allowed": False,
+            "artifacts": {},
+        }
     with _connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             """

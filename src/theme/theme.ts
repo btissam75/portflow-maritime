@@ -28,7 +28,7 @@ import TableBody from './components/TableBody';
 export const theme = createTheme({
   palette,
   typography,
-  shape: { borderRadius: 8 },
+  shape: { borderRadius: 12 },
   mixins: {
     toolbar: {
       minHeight: 72,

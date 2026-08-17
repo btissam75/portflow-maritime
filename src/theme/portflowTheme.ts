@@ -25,7 +25,7 @@ export const portflowTheme = createTheme({
     body2: portflowTypography.secondary,
     button: { fontSize: 12, lineHeight: 1.2, fontWeight: 650, textTransform: 'none' },
   },
-  shape: { borderRadius: 8 },
+  shape: { borderRadius: 12 },
   components: {
     MuiCssBaseline: {
       styleOverrides: {

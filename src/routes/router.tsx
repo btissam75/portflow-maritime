@@ -5,9 +5,9 @@ import paths from './paths';
 
 const App = lazy(() => import('App'));
 const MainLayout = lazy(() => import('layouts/main-layout'));
-const ControlTowerPage = lazy(() => import('pages/maritime/ControlTowerPage'));
 const WeatherPage = lazy(() => import('pages/maritime/WeatherPage'));
 const CapacityPage = lazy(() => import('pages/maritime/CapacityPage'));
+const ControlTowerPage = lazy(() => import('pages/control-tower/ControlTowerPage'));
 
 import PageLoader from 'components/loading/PageLoader';
 import Progress from 'components/loading/Progress';
@@ -21,14 +21,6 @@ export const routes = [
     ),
     children: [
       {
-        path: paths.controlTower,
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <ControlTowerPage />
-          </Suspense>
-        ),
-      },
-      {
         path: rootPaths.root,
         element: (
           <MainLayout>
@@ -40,7 +32,51 @@ export const routes = [
         children: [
           {
             index: true,
-            element: <Navigate to={paths.controlTower} replace />,
+            element: <Navigate to={paths.overview} replace />,
+          },
+          {
+            path: paths.overview,
+            element: <ControlTowerPage view="overview" />,
+          },
+          {
+            path: paths.units,
+            element: <ControlTowerPage view="units" />,
+          },
+          {
+            path: paths.process,
+            element: <ControlTowerPage view="process" />,
+          },
+          {
+            path: paths.forecast,
+            element: <ControlTowerPage view="forecast" />,
+          },
+          {
+            path: paths.alerts,
+            element: <ControlTowerPage view="alerts" />,
+          },
+          {
+            path: paths.decisions,
+            element: <ControlTowerPage view="decisions" />,
+          },
+          {
+            path: paths.vessels,
+            element: <ControlTowerPage view="vessels" />,
+          },
+          {
+            path: paths.simulation,
+            element: <ControlTowerPage view="simulation" />,
+          },
+          {
+            path: paths.quality,
+            element: <ControlTowerPage view="quality" />,
+          },
+          {
+            path: paths.audit,
+            element: <ControlTowerPage view="audit" />,
+          },
+          {
+            path: paths.reports,
+            element: <ControlTowerPage view="reports" />,
           },
           {
             path: paths.weather,
@@ -54,7 +90,7 @@ export const routes = [
       },
       {
         path: '*',
-        element: <Navigate to={paths.controlTower} replace />,
+        element: <Navigate to={paths.overview} replace />,
       },
     ],
   },

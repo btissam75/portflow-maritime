@@ -232,8 +232,6 @@ nginx -t
 
     Assert-PublishedAsset -Label "weather page" -Pattern "WeatherPage-*.js"
     Assert-PublishedAsset -Label "capacity page" -Pattern "CapacityPage-*.js"
-    Assert-PublishedAsset -Label "control tower page" -Pattern "ControlTowerPage-*.js"
-    Assert-PublishedMarker -Label "control tower shell" -Marker "Control Tower"
     Assert-PublishedMarker -Label "interactive weather map" -Marker "portflow-strait"
     # Keep deployment markers ASCII-only because Windows PowerShell 5.1 can
     # reinterpret UTF-8 punctuation when this script has no BOM.
@@ -277,15 +275,14 @@ nginx -t
         throw "The restored bundle and Nginx are healthy inside the container, but Docker Desktop is not forwarding port 8088 to Windows. Published binding: $($PortBinding.Trim())"
     }
 
-    foreach ($Route in @("weather", "capacity", "control-tower")) {
+    foreach ($Route in @("weather", "capacity")) {
         $Response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:8088/$Route" -TimeoutSec 10
         if ($Response.StatusCode -ne 200) {
             throw "Frontend route /$Route returned HTTP $($Response.StatusCode)"
         }
     }
 
-    Write-Host "[OK] PortFlow control tower deployed" -ForegroundColor Green
-    Write-Host "Control Tower: http://127.0.0.1:8088/control-tower"
+    Write-Host "[OK] PortFlow maritime interface deployed" -ForegroundColor Green
     Write-Host "Weather: http://127.0.0.1:8088/weather"
     Write-Host "Capacity: http://127.0.0.1:8088/capacity"
 }

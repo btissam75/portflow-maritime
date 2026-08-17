@@ -5,59 +5,307 @@ import paths from 'routes/paths';
 import { portflowPalette as pf } from 'theme/portflowPalette';
 
 const navigation = [
-  { label: 'Control Tower', shortLabel: 'Contrôle', path: paths.controlTower, icon: 'lucide:layout-dashboard' },
-  { label: 'Météo & état de mer', shortLabel: 'Météo', path: paths.weather, icon: 'lucide:cloud-sun' },
-  { label: 'Escales & capacité', shortLabel: 'Escales', path: paths.capacity, icon: 'lucide:ship' },
+  {
+    group: 'SUPERVISION',
+    items: [
+      {
+        label: 'Vue globale',
+        shortLabel: 'Global',
+        path: paths.overview,
+        icon: 'lucide:layout-dashboard',
+      },
+      {
+        label: 'Unités prioritaires',
+        shortLabel: 'Unités',
+        path: paths.units,
+        icon: 'lucide:container',
+      },
+      { label: 'Flux métier', shortLabel: 'Flux', path: paths.process, icon: 'lucide:git-branch' },
+      {
+        label: 'Prévisions',
+        shortLabel: 'Prévisions',
+        path: paths.forecast,
+        icon: 'lucide:chart-no-axes-combined',
+      },
+    ],
+  },
+  {
+    group: 'DÉCISION',
+    items: [
+      { label: 'Alertes', shortLabel: 'Alertes', path: paths.alerts, icon: 'lucide:shield-alert' },
+      {
+        label: 'Décisions',
+        shortLabel: 'Décisions',
+        path: paths.decisions,
+        icon: 'lucide:list-checks',
+      },
+      {
+        label: 'Simulation',
+        shortLabel: 'What-if',
+        path: paths.simulation,
+        icon: 'lucide:flask-conical',
+      },
+    ],
+  },
+  {
+    group: 'TERRITOIRE',
+    items: [
+      {
+        label: 'Approches navires',
+        shortLabel: 'Navires',
+        path: paths.vessels,
+        icon: 'lucide:ship',
+      },
+      {
+        label: 'Météo & état de mer',
+        shortLabel: 'Météo',
+        path: paths.weather,
+        icon: 'lucide:cloud-sun',
+      },
+      {
+        label: 'Escales & capacité',
+        shortLabel: 'Escales',
+        path: paths.capacity,
+        icon: 'lucide:calendar-range',
+      },
+    ],
+  },
+  {
+    group: 'GOUVERNANCE',
+    items: [
+      {
+        label: 'Qualité des données',
+        shortLabel: 'Qualité',
+        path: paths.quality,
+        icon: 'lucide:database-zap',
+      },
+      {
+        label: 'Journal d’audit',
+        shortLabel: 'Audit',
+        path: paths.audit,
+        icon: 'lucide:scroll-text',
+      },
+      {
+        label: 'Rapports',
+        shortLabel: 'Rapports',
+        path: paths.reports,
+        icon: 'lucide:file-chart-column',
+      },
+    ],
+  },
 ] as const;
+
+type NavigationItem = {
+  label: string;
+  shortLabel: string;
+  path: string;
+  icon: string;
+};
+
+const mobileItems: NavigationItem[] = navigation.reduce<NavigationItem[]>(
+  (items, section) => [...items, ...section.items],
+  [],
+);
 
 const NavigationRail = () => {
   const location = useLocation();
 
   return (
     <>
-      <Box component="aside" sx={{ display: { xs: 'none', md: 'flex' }, position: 'fixed', inset: '0 auto 0 0', zIndex: 1300, width: { md: 64, xl: 208 }, flexDirection: 'column', bgcolor: pf.background.navigation, borderRight: `1px solid ${pf.structure.border}`, overflow: 'hidden', transition: 'width 220ms cubic-bezier(0.2,0.8,0.2,1)' }}>
-        <Stack direction="row" alignItems="center" gap={1.1} sx={{ height: 64, px: { md: 1.4, xl: 2 }, borderBottom: `1px solid ${pf.structure.border}` }}>
-          <Box sx={{ width: 36, height: 36, display: 'grid', placeItems: 'center', color: pf.functional.cyan, bgcolor: pf.functional.cyanSoft, border: `1px solid ${pf.functional.cyan}55`, borderRadius: '8px', flexShrink: 0 }}>
-            <IconifyIcon icon="lucide:anchor" sx={{ fontSize: 19 }} />
-          </Box>
-          <Box sx={{ display: { md: 'none', xl: 'block' }, minWidth: 0 }}>
-            <Typography sx={{ color: pf.text.primary, fontSize: 14, fontWeight: 700 }}>PORTFLOW</Typography>
-            <Typography sx={{ color: pf.text.tertiary, fontSize: 11 }}>TANGER MED</Typography>
+      <Box
+        component="aside"
+        sx={{
+          display: { xs: 'none', md: 'flex' },
+          position: 'fixed',
+          inset: '0 auto 0 0',
+          zIndex: 1300,
+          width: 78,
+          flexDirection: 'column',
+          bgcolor: pf.background.navigation,
+          borderRight: `1px solid ${pf.structure.border}`,
+          overflow: 'hidden',
+          boxShadow: '12px 0 34px rgba(0,0,0,.18)',
+        }}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          gap={1.1}
+          sx={{
+            height: 84,
+            px: 0,
+            justifyContent: 'center',
+            borderBottom: `1px solid ${pf.structure.border}`,
+          }}
+        >
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              display: 'grid',
+              placeItems: 'center',
+              color: pf.functional.cyan,
+              bgcolor: pf.functional.cyanSoft,
+              border: `1px solid ${pf.functional.cyan}55`,
+              borderRadius: '13px',
+              flexShrink: 0,
+            }}
+          >
+            <IconifyIcon icon="lucide:waves" sx={{ fontSize: 22 }} />
           </Box>
         </Stack>
 
-        <Stack component="nav" gap={0.45} px={{ md: 0.75, xl: 1 }} py={1.5}>
-          {navigation.map((item) => {
-            const active = location.pathname.startsWith(item.path);
-            return (
-              <Tooltip key={item.path} title={item.label} placement="right" arrow>
-                <Box component={Link} to={item.path} aria-current={active ? 'page' : undefined} sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: { md: 'center', xl: 'flex-start' }, width: 1, height: 40, px: { md: 0, xl: 1.15 }, color: active ? pf.text.primary : pf.text.secondary, background: active ? 'linear-gradient(90deg, rgba(54,214,207,0.18), rgba(73,167,255,0.05))' : 'transparent', borderRadius: '8px', textDecoration: 'none', transition: 'background-color 140ms ease, color 140ms ease, transform 140ms ease', '&::before': { content: '""', position: 'absolute', left: 0, width: 2, height: active ? 24 : 0, bgcolor: pf.functional.cyan }, '&:hover': { bgcolor: 'rgba(54,214,207,0.07)', color: pf.text.primary, transform: 'translateX(2px)' }, '&:focus-visible': { outline: `2px solid ${pf.functional.blue}`, outlineOffset: -2 } }}>
-                  <IconifyIcon icon={item.icon} sx={{ color: active ? pf.functional.cyan : 'inherit', fontSize: 17, flexShrink: 0 }} />
-                  <Typography noWrap sx={{ display: { md: 'none', xl: 'block' }, ml: 1, color: 'inherit', fontSize: 13, fontWeight: active ? 600 : 400 }}>{item.label}</Typography>
-                </Box>
-              </Tooltip>
-            );
-          })}
-        </Stack>
-
-        <Stack mt="auto" p={{ md: 1, xl: 1.5 }}>
-          <Stack direction="row" alignItems="center" justifyContent={{ md: 'center', xl: 'flex-start' }} gap={1}>
-            <Avatar sx={{ width: 34, height: 34, bgcolor: pf.functional.cyanSoft, color: pf.functional.cyan, border: `1px solid ${pf.functional.cyan}45`, fontSize: 11 }}>OP</Avatar>
-            <Box sx={{ display: { md: 'none', xl: 'block' } }}>
-              <Typography sx={{ color: pf.text.primary, fontSize: 12, fontWeight: 600 }}>Opérateur salle</Typography>
-              <Typography sx={{ color: pf.text.tertiary, fontSize: 11 }}>Quart B</Typography>
+        <Box
+          component="nav"
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            px: 1,
+            py: 1.3,
+            '&::-webkit-scrollbar': { width: 3 },
+            '&::-webkit-scrollbar-thumb': { bgcolor: pf.structure.border, borderRadius: 4 },
+          }}
+        >
+          {navigation.map((section) => (
+            <Box key={section.group} mb={0.45}>
+              <Typography
+                sx={{
+                  display: 'none',
+                  px: 1.1,
+                  py: 0.5,
+                  color: pf.text.disabled,
+                  fontSize: 7,
+                  fontWeight: 900,
+                  letterSpacing: '.13em',
+                }}
+              >
+                {section.group}
+              </Typography>
+              <Stack gap={0.55}>
+                {section.items.map((item) => {
+                  const active =
+                    location.pathname === item.path ||
+                    location.pathname.startsWith(`${item.path}/`);
+                  return (
+                    <Tooltip key={item.path} title={item.label} placement="right" arrow>
+                      <Box
+                        component={Link}
+                        to={item.path}
+                        aria-current={active ? 'page' : undefined}
+                        sx={{
+                          position: 'relative',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 1,
+                          height: 42,
+                          px: 0,
+                          color: active ? pf.text.primary : pf.text.tertiary,
+                          background: active
+                            ? 'linear-gradient(90deg, rgba(85,214,194,.15), rgba(165,139,250,.035))'
+                            : 'transparent',
+                          borderRadius: '11px',
+                          textDecoration: 'none',
+                          transition: 'all 140ms ease',
+                          '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            left: -8,
+                            width: 3,
+                            height: active ? 26 : 0,
+                            bgcolor: pf.functional.cyan,
+                          },
+                          '&:hover': {
+                            bgcolor: 'rgba(85,214,194,.07)',
+                            color: pf.text.primary,
+                            transform: 'translateY(-1px)',
+                          },
+                          '&:focus-visible': {
+                            outline: `2px solid ${pf.functional.cyan}`,
+                            outlineOffset: -2,
+                          },
+                        }}
+                      >
+                        <IconifyIcon
+                          icon={item.icon}
+                          sx={{
+                            color: active ? pf.functional.cyan : 'inherit',
+                            fontSize: 19,
+                            flexShrink: 0,
+                          }}
+                        />
+                      </Box>
+                    </Tooltip>
+                  );
+                })}
+              </Stack>
             </Box>
+          ))}
+        </Box>
+
+        <Stack p={1} sx={{ borderTop: `1px solid ${pf.structure.border}` }}>
+          <Stack direction="row" alignItems="center" justifyContent="center" gap={1}>
+            <Avatar
+              sx={{
+                width: 31,
+                height: 31,
+                bgcolor: pf.functional.cyanSoft,
+                color: pf.functional.cyan,
+                border: `1px solid ${pf.functional.cyan}45`,
+                fontSize: 9,
+              }}
+            >
+              OP
+            </Avatar>
           </Stack>
         </Stack>
       </Box>
 
-      <Box component="nav" aria-label="Navigation principale" sx={{ display: { xs: 'grid', md: 'none' }, position: 'fixed', zIndex: 1300, left: 10, right: 10, bottom: 10, gridTemplateColumns: 'repeat(3,minmax(0,1fr))', bgcolor: 'rgba(7,23,34,0.96)', border: `1px solid ${pf.structure.border}`, borderRadius: '8px', boxShadow: '0 16px 40px rgba(0,0,0,0.34)', backdropFilter: 'blur(14px)', overflow: 'hidden' }}>
-        {navigation.map((item) => {
-          const active = location.pathname.startsWith(item.path);
+      <Box
+        component="nav"
+        aria-label="Navigation principale"
+        sx={{
+          display: { xs: 'flex', md: 'none' },
+          position: 'fixed',
+          zIndex: 1300,
+          left: 8,
+          right: 8,
+          bottom: 8,
+          height: 61,
+          bgcolor: 'rgba(13,15,18,.96)',
+          border: `1px solid ${pf.structure.border}`,
+          borderRadius: '12px',
+          boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
+          backdropFilter: 'blur(14px)',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          '&::-webkit-scrollbar': { display: 'none' },
+        }}
+      >
+        {mobileItems.map((item) => {
+          const active =
+            location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
           return (
-            <Stack key={item.path} component={Link} to={item.path} alignItems="center" justifyContent="center" gap={0.25} sx={{ minHeight: 58, color: active ? pf.functional.cyan : pf.text.tertiary, textDecoration: 'none', bgcolor: active ? pf.functional.cyanSoft : 'transparent', borderTop: active ? `2px solid ${pf.functional.cyan}` : '2px solid transparent' }}>
-              <IconifyIcon icon={item.icon} sx={{ fontSize: 18 }} />
-              <Typography sx={{ color: 'inherit', fontSize: 11 }}>{item.shortLabel}</Typography>
+            <Stack
+              key={item.path}
+              component={Link}
+              to={item.path}
+              alignItems="center"
+              justifyContent="center"
+              gap={0.25}
+              sx={{
+                minWidth: 72,
+                color: active ? pf.functional.cyan : pf.text.tertiary,
+                textDecoration: 'none',
+                bgcolor: active ? pf.functional.cyanSoft : 'transparent',
+                borderTop: active ? `2px solid ${pf.functional.cyan}` : '2px solid transparent',
+              }}
+            >
+              <IconifyIcon icon={item.icon} sx={{ fontSize: 17 }} />
+              <Typography sx={{ color: 'inherit', fontSize: 8.5, whiteSpace: 'nowrap' }}>
+                {item.shortLabel}
+              </Typography>
             </Stack>
           );
         })}
